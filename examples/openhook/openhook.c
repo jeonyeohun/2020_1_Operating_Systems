@@ -10,22 +10,22 @@
 
 MODULE_LICENSE("GPL");
 
-char filepath[128] = { 0x0, } ;
+char filepath[128] = { 0x0, } ; // indicate filename, given by user program
 void ** sctable ;
-int count = 0 ;
+int count = 0 ; // how many times the file opened 
 
-asmlinkage int (*orig_sys_open)(const char __user * filename, int flags, umode_t mode) ; 
+asmlinkage/*prefix for system call routine*/ int (*orig_sys_open/*function pointer*/)(const char __user * filename, int flags, umode_t mode)/*argument type of the function*/ ; 
 
 asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_t mode)
 {
-	char fname[256] ;
+	char fname[256] ; // kernel memory space
 
-	copy_from_user(fname, filename, 256) ;
+	copy_from_user(fname, filename, 256) ; // bring filename from user level to kernel level
 
 	if (filepath[0] != 0x0 && strcmp(filepath, fname) == 0) {
-		count++ ;
+		count++ ; // system open is invoked, and the open is target specific file that specified by user application, increase count
 	}
-	return orig_sys_open(filename, flags, mode) ;
+	return orig_sys_open(filename, flags, mode) ; // 
 }
 
 
@@ -91,21 +91,24 @@ int __init openhook_init(void) {
 
 	proc_create("openhook", S_IRUGO | S_IWUGO, NULL, &openhook_fops) ;
 
-	sctable = (void *) kallsyms_lookup_name("sys_call_table") ;
+	sctable = (void *) kallsyms_lookup_name("sys_call_table") ; // bring system call handler table
 
-	orig_sys_open = sctable[__NR_open] ;
+	orig_sys_open = sctable[__NR_open] ; // the index of system call routine given by linux kernel(/include/linux/syscalls.h)
+
+	
 
 	pte = lookup_address((unsigned long) sctable, &level) ;
+	/*sctable is read only so we need to change the authorization temporarily*/
 	if (pte->pte &~ _PAGE_RW) 
 		pte->pte |= _PAGE_RW ;	
 
-	sctable[__NR_open] = openhook_sys_open ;
+	sctable[__NR_open] = openhook_sys_open ; // change system call routine by defined function.
 
 	return 0;
 }
 
 static 
-void __exit openhook_exit(void) {
+void __exit openhook_exit(void) { // restore original system call handler
 	unsigned int level ;
 	pte_t * pte ;
 	remove_proc_entry("openhook", NULL) ;
