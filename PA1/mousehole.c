@@ -1,10 +1,12 @@
-#include <linux/model.h>
-#include <linux/kernel.h>
-#include <linux/sched/signal.h>
+#include <linux/syscalls.h>
+#include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
-#include <linux/slab.h>
+#include <linux/kallsyms.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <asm/unistd.h>
 #include <linux/cred.h>
 
 MODULE_LISCENSE("GPL");
