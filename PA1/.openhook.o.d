@@ -1,5 +1,4 @@
-openhook.o: \
- /home/jeon/Desktop/2020_1_Operating_Systems/examples/openhook/openhook.c \
+openhook.o: /home/jeon/Desktop/2020_1_Operating_Systems/PA1/openhook.c \
  include/linux/kconfig.h include/generated/autoconf.h \
  include/linux/compiler_types.h include/linux/compiler-gcc.h \
  include/linux/syscalls.h include/linux/types.h \
