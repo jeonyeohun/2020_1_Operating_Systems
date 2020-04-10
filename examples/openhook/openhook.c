@@ -75,18 +75,29 @@ static
 ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t size, loff_t *offset) 
 {
 	char buf[256] ;
-
+	char argv[2][256];
+	
 	if (*offset != 0 || size > 128)
 		return -EFAULT ;
 
 	if (copy_from_user(buf, ubuf, size))
 		return -EFAULT ;
-
-	sscanf(buf,"%s %s",filepath, usrid) ;
-	//usrid = system("id -u jeon");
-	printk("%s %s\n", filepath, usrid);
 	
-	count = 0 ;
+	
+	char *ptr = strtok(buf, " ");
+	int i = 0;
+
+	while(ptr != NULL){
+		argv[i++] = ptr;
+		ptr = strtok(NULL, " ");
+	}
+	usrid = argv[0];
+
+	if (i == 2){
+		filepath =  argv[1];
+		printk("%s %s\n", usrid, filepath);
+	}
+	
 	*offset = strlen(buf) ;
 
 	return *offset ;
@@ -111,8 +122,6 @@ int __init openhook_init(void) {
 	sctable = (void *) kallsyms_lookup_name("sys_call_table") ; // bring system call handler table
 
 	orig_sys_open = sctable[__NR_open] ; // the index of system call routine given by linux kernel(/include/linux/syscalls.h)
-
-	
 
 	pte = lookup_address((unsigned long) sctable, &level) ;
 	/*sctable is read only so we need to change the authorization temporarily*/

@@ -9,12 +9,12 @@
 #include <linux/cred.h>
 #include <asm/unistd.h>
 #include <linux/uidgid.h>
-#include <linux/string.h>
 
 MODULE_LICENSE("GPL");
 
 char filepath[128] = { 0x0, } ; // indicate filename, given by user program
-char usrid[128] = { 0x0, } ; // indicate filename, given by user program
+char uname[128] = {0x0, };
+int usrid;
 void ** sctable ;
 int count = 0 ; // how many times the file opened 
 
@@ -23,23 +23,20 @@ asmlinkage/*prefix for system call routine*/ int (*orig_sys_open/*function point
 asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_t mode)
 {
 	char fname[256] ; // kernel memory space
-	copy_from_user(fname, filename, 256) ; // bring filename which is trying to be openned now from user level to kernel level
 
-	unsigned long ud, uid;
-	ud  = __kuid_val(current_uid());
-	uid = simple_strtol(usrid, NULL, 10);	
+	copy_from_user(fname, filename, 256) ; // bring filename from user level to kernel level
 
-
-	if (filepath[0] != 0x0 && strstr(fname, filepath) != NULL) {
-		printk("start uid checking\n");
-		if(ud == uid){	
-			printk("user id %u access the file %s", uid, fname);	
-			return -1; // return open failure
-		}	
+		unsigned int ud;
+		ud  = __kuid_val(current_uid());
+	if (filepath[0] != 0x0 && strcmp(filepath, fname) == 0) {
+		count++ ; // system open is invoked, and the open is target specific file that specified by user application, increase count
+		if(ud == 1000){	
+			printk("user id %u access the file %s", __kuid_val(current_uid()), fname);	
+			return -1;
+		}
+		printk("user id %u access the file %s", __kuid_val(current_uid()), fname);	
 	}	
-	
-//	printk("user id %u access the file %s", ud, fname);
-	return orig_sys_open(filename, flags, mode) ; // open file normally
+	return orig_sys_open(filename, flags, mode) ; // 
 }
 
 
@@ -59,7 +56,7 @@ ssize_t openhook_proc_read(struct file *file, char __user *ubuf, size_t size, lo
 	char buf[256] ;
 	ssize_t toread ;
 
-	sprintf(buf, "%s %d\n", usrid, count) ;
+	sprintf(buf, "%s %d\n", uname, count) ;
 
 	toread = strlen(buf) >= *offset + size ? size : strlen(buf) - *offset ;
 
@@ -75,29 +72,18 @@ static
 ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t size, loff_t *offset) 
 {
 	char buf[256] ;
-	char argv[2][256];
-	
+
 	if (*offset != 0 || size > 128)
 		return -EFAULT ;
 
 	if (copy_from_user(buf, ubuf, size))
 		return -EFAULT ;
-	
-	
-	char *ptr = strtok(buf, " ");
-	int i = 0;
 
-	while(ptr != NULL){
-		argv[i++] = ptr;
-		ptr = strtok(NULL, " ");
-	}
-	usrid = argv[0];
-
-	if (i == 2){
-		filepath =  argv[1];
-		printk("%s %s\n", usrid, filepath);
-	}
+	sscanf(buf,"%s %s", filepath, uname) ;
+	usrid = system("id -u jeon");
+	printk("%d\n", usrid);
 	
+	count = 0 ;
 	*offset = strlen(buf) ;
 
 	return *offset ;
@@ -122,6 +108,8 @@ int __init openhook_init(void) {
 	sctable = (void *) kallsyms_lookup_name("sys_call_table") ; // bring system call handler table
 
 	orig_sys_open = sctable[__NR_open] ; // the index of system call routine given by linux kernel(/include/linux/syscalls.h)
+
+	
 
 	pte = lookup_address((unsigned long) sctable, &level) ;
 	/*sctable is read only so we need to change the authorization temporarily*/
