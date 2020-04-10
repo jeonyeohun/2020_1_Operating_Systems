@@ -9,12 +9,12 @@
 #include <linux/cred.h>
 #include <asm/unistd.h>
 #include <linux/uidgid.h>
+#include <string.h>
 
 MODULE_LICENSE("GPL");
 
 char filepath[128] = { 0x0, } ; // indicate filename, given by user program
 char uname[128] = {0x0, };
-int usrid;
 void ** sctable ;
 int count = 0 ; // how many times the file opened 
 
@@ -23,20 +23,20 @@ asmlinkage/*prefix for system call routine*/ int (*orig_sys_open/*function point
 asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_t mode)
 {
 	char fname[256] ; // kernel memory space
+	copy_from_user(fname, filename, 256) ; // bring filename which is trying to be openned now from user level to kernel level
 
-	copy_from_user(fname, filename, 256) ; // bring filename from user level to kernel level
-
-		unsigned int ud;
-		ud  = __kuid_val(current_uid());
-	if (filepath[0] != 0x0 && strcmp(filepath, fname) == 0) {
-		count++ ; // system open is invoked, and the open is target specific file that specified by user application, increase count
+	unsigned int ud;
+	ud  = __kuid_val(current_uid());
+	
+	if (filepath[0] != 0x0 && strstr(filepath, fname) != 0x0) {
 		if(ud == 1000){	
-			printk("user id %u access the file %s", __kuid_val(current_uid()), fname);	
-			return -1;
-		}
-		printk("user id %u access the file %s", __kuid_val(current_uid()), fname);	
+			printk("user id %u access the file %s", ud, fname);	
+			return -1; // return open failure
+		}	
 	}	
-	return orig_sys_open(filename, flags, mode) ; // 
+	
+	printk("user id %u access the file %s", ud, fname);
+	return orig_sys_open(filename, flags, mode) ; // open file normally
 }
 
 
@@ -80,8 +80,8 @@ ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t s
 		return -EFAULT ;
 
 	sscanf(buf,"%s %s", filepath, uname) ;
-	usrid = system("id -u jeon");
-	printk("%d\n", usrid);
+	//usrid = system("id -u jeon");
+	printk("%s %s\n", filepath, uname);
 	
 	count = 0 ;
 	*offset = strlen(buf) ;
