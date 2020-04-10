@@ -35,9 +35,10 @@ int main (int argc, char *argv[] ){
         fgets(uid, 256, pf);
         uid[strlen(uid)-1] = '\0';
 
-        /*put two arguments in one string*/
+        /*put two arguments and command type in one string*/
         strcat(fname, " ");
         strcat(fname, uid);
+        strcat(fname, "blkopn");
 
         int fd = open("/proc/openhook", O_RDWR);
         write(fd, fname, strlen(fname)+1);
