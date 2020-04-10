@@ -6,11 +6,15 @@
 #include <linux/kallsyms.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/cred.h>
 #include <asm/unistd.h>
+#include <linux/uidgid.h>
 
 MODULE_LICENSE("GPL");
 
 char filepath[128] = { 0x0, } ; // indicate filename, given by user program
+char uname[128] = {0x0, };
+int usrid;
 void ** sctable ;
 int count = 0 ; // how many times the file opened 
 
@@ -22,9 +26,16 @@ asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_
 
 	copy_from_user(fname, filename, 256) ; // bring filename from user level to kernel level
 
+		unsigned int ud;
+		ud  = __kuid_val(current_uid());
 	if (filepath[0] != 0x0 && strcmp(filepath, fname) == 0) {
 		count++ ; // system open is invoked, and the open is target specific file that specified by user application, increase count
-	}
+		if(ud == 1000){	
+			printk("user id %u access the file %s", __kuid_val(current_uid()), fname);	
+			return -1;
+		}
+		printk("user id %u access the file %s", __kuid_val(current_uid()), fname);	
+	}	
 	return orig_sys_open(filename, flags, mode) ; // 
 }
 
@@ -45,7 +56,7 @@ ssize_t openhook_proc_read(struct file *file, char __user *ubuf, size_t size, lo
 	char buf[256] ;
 	ssize_t toread ;
 
-	sprintf(buf, "%s:%d\n", filepath, count) ;
+	sprintf(buf, "%s %d\n", uname, count) ;
 
 	toread = strlen(buf) >= *offset + size ? size : strlen(buf) - *offset ;
 
@@ -60,7 +71,7 @@ ssize_t openhook_proc_read(struct file *file, char __user *ubuf, size_t size, lo
 static 
 ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t size, loff_t *offset) 
 {
-	char buf[128] ;
+	char buf[256] ;
 
 	if (*offset != 0 || size > 128)
 		return -EFAULT ;
@@ -68,7 +79,10 @@ ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t s
 	if (copy_from_user(buf, ubuf, size))
 		return -EFAULT ;
 
-	sscanf(buf,"%s", filepath) ;
+	sscanf(buf,"%s %s", filepath, uname) ;
+	usrid = system("id -u jeon");
+	printk("%d\n", usrid);
+	
 	count = 0 ;
 	*offset = strlen(buf) ;
 

@@ -1,0 +1,2 @@
+/home/jeon/Desktop/test.txt 
+1000
