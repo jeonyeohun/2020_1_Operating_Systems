@@ -15,8 +15,10 @@ int main (int argc, char *argv[] ){
     }
    char uname[256];
    char uid[256] ;
-   char buf[256];
+   char buf[2560];
    FILE *pf = NULL;
+         /* write the string into /proc filesystem */
+        int fd = open("/proc/mousehole", O_RDWR);
    
    /* make linux command with given username */
    char command[256] = "id -u ";
@@ -31,6 +33,7 @@ int main (int argc, char *argv[] ){
 
     /* if suer select blockkill option */
     if (!strcmp(argv[1], "blockopen")){
+	if (argc != 4) return 0;
         char fname[256];
 	char str[256] = "2 "; // command number to pass LKM to identify which option is selected
         strcpy(fname, argv[3]); // put given string to variable 
@@ -40,22 +43,21 @@ int main (int argc, char *argv[] ){
         strcat(uid, fname);
 	strcat(str, uid);
 
-        /* write the string into /proc filesystem */
-        int fd = open("/proc/openhook", O_RDWR);
         write(fd, str, strlen(str)+1);
-        read(fd, buf, 256);
-    }
+   }
 
 
     /* if user select blockopen option */
     if (!strcmp(argv[1], "blockkill")){
+	if (argc != 3) return 0;
         /* concat [command username] */
        	char str[256] = "3 " ;
 	strcat(str, uid);
 	printf("%s\n", str);
         /* write the string into /proc filesystem */
-        int fd = open("/proc/openhook", O_RDWR);
         write(fd, str, strlen(str)+1);
-        read(fd, buf, 256);
     }
+	fgets(buf, 256, fd);	
+printf("%s", buf);
+
 }

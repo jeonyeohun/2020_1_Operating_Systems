@@ -70,14 +70,14 @@ int mousehole_proc_release(struct inode *inode, struct file *file) {
 static
 ssize_t mousehole_proc_read(struct file *file, char __user *ubuf, size_t size, loff_t *offset) 
 {
-	char buf[256] ;
+	char buf[1000] ;
 	ssize_t toread ;
 
 	if (command == 2){
-		sprintf(buf, "Mousehole module is currently protecting files contain \"%s\" in the filename from user with uid %d\n", filepath, uid) ;
+		sprintf(buf, "Module is currently protecting files contain \"%s\" in the filename from user with uid %d\n", filepath, uid) ;
 	}
 	if (command == 3){
-		sprintf(buf, "Mousehole module is currently protecting all processes created by user with uid %d from kill system call\n", uid) ;
+		sprintf(buf, "Module is currently protecting all processes created by user with uid %d from kill system call\n", uid) ;
 	}
 
 	toread = strlen(buf) >= *offset + size ? size : strlen(buf) - *offset ;
