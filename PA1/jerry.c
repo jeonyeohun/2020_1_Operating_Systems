@@ -8,7 +8,7 @@ int main (int argc, char *argv[] ){
    
     /* if user did not put any arguments, print help message */
     if (argc == 1){
-        printf("usage: ./jerry [--blockopen username filename] [--blockkill username]\n");
+        printf("usage: <[blockopen username filename] | [blockkill username]>\n");
         printf("\t blockopen: Block user with given user name from opening file has given filename as substring\n");
         printf("\t blockkill: Make processes made by given user name never be killed by other process\n");
 	return 0;
@@ -39,11 +39,9 @@ int main (int argc, char *argv[] ){
         strcat(uid, fname);
 	strcat(str, uid);
 
-	printf("%s\n", str);
         /* write the string into /proc filesystem */
         int fd = open("/proc/openhook", O_RDWR);
         write(fd, str, strlen(str)+1);
-	printf("write success\n");
     }
 
 

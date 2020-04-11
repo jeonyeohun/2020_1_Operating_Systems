@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/cred.h>
+#include <linux/cred/signal.h>
 #include <asm/unistd.h>
 #include <linux/uidgid.h>
 #include <linux/string.h>
@@ -19,6 +20,18 @@ void ** sctable ;
 int command = 0;
 
 asmlinkage int (*orig_sys_open)(const char __user * filename, int flags, umode_t mode) ; 
+asmlinkage int (*orig_sys_kill)(pid_t pid, int sig);
+
+asmlinkage int openhook_sys_kill (pid_t pid, int sig){
+	struct task_struct * t ;
+	for_each_process(t){
+		if(pid == t->pid && t->cred->uid.val == uid){
+			return -1;
+		}
+	}
+
+	return orig_sys_kill(pid, sig);
+}
 
 asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_t mode)
 {
@@ -78,7 +91,10 @@ ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t s
 		return -EFAULT ;
 
 	sscanf(buf,"%d %d %s", &command, &uid, filepath) ;
-	printk("%d %d %s\n", command, uid, filepath);
+	
+	if (command == 3){
+		filepath = NULL;
+	}
 	
 	*offset = strlen(buf) ;
 
@@ -104,6 +120,7 @@ int __init openhook_init(void) {
 	sctable = (void *) kallsyms_lookup_name("sys_call_table") ; // bring system call handler table
 
 	orig_sys_open = sctable[__NR_open] ; // the index of system call routine given by linux kernel(/include/linux/syscalls.h)
+	orig_sys_kill = sctable[37];
 
 	pte = lookup_address((unsigned long) sctable, &level) ;
 	/*sctable is read only so we need to change the authorization temporarily*/
@@ -111,6 +128,7 @@ int __init openhook_init(void) {
 		pte->pte |= _PAGE_RW ;	
 
 	sctable[__NR_open] = openhook_sys_open ; // change system call routine by defined function.
+	sctable[37] = openhool_sys_kill ;
 
 	return 0;
 }
@@ -122,6 +140,7 @@ void __exit openhook_exit(void) { // restore original system call handler
 	remove_proc_entry("openhook", NULL) ;
 
 	sctable[__NR_open] = orig_sys_open ;
+	sctable[37] = orig_sys_kill ;
 	pte = lookup_address((unsigned long) sctable, &level) ;
 	pte->pte = pte->pte &~ _PAGE_RW ;
 }
