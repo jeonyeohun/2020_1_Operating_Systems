@@ -9,7 +9,6 @@ void help()
 	printf("usage:<[blockopen username filename] |[blockkill username]>\n");
 	printf("\t blockopen: Block user with given user name from opening file has given filename as substring\n");
 	printf("\t blockkill: Make processes made by given user name never be killed by other process\n");
-	return 0;
 }
 
 int main(int argc, char *argv[])
@@ -22,9 +21,10 @@ int main(int argc, char *argv[])
 	int fd = open("/proc/mousehole", O_RDWR);
 
 	/*if user did not put any arguments, print help message */
-	if (argc == 1)
+	if (argc == 1 || strcmp(argv[1], "blockopen") || strcmp(argv[1], "blockill"))
 	{
 		help();
+		return 0;
 	}
 
 	/*make linux command with given username */
@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
 		if (argc != 4)
 		{
 			help();
+			return 0;
 		}
 		char fname[256];
 		char str[256] = "2 ";	// command number to pass LKM to identify which option is selected
@@ -63,6 +64,7 @@ int main(int argc, char *argv[])
 		if (argc != 3)
 		{
 			help();
+			return 0;
 		}
 		/*concat[command username] */
 		char str[256] = "3 ";

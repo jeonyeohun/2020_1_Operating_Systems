@@ -102,7 +102,13 @@ ssize_t mousehole_proc_write(struct file *file, const char __user *ubuf, size_t 
 		return -EFAULT ;
 
 	/* read written string from user buffer(jerry) */
-	sscanf(buf,"%d %d %s", &command, &uid, filepath) ;
+
+	if (buf[0] = '2'){
+		sscanf(buf,"%d %d %s", &command, &uid, filepath) ;
+	}
+	if (buf[0] = '3'){
+		sscanf(buf,"%d %d", &command, &uid) ;
+	}
 	
 	*offset = strlen(buf) ;
 
