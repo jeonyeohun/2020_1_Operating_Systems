@@ -50,7 +50,7 @@ int main (int argc, char *argv[] ){
         /* concat [command username] */
        	char str[256] = "3 " ;
 	strcat(str, uid);
-
+	printf("%s\n", str);
         /* write the string into /proc filesystem */
         int fd = open("/proc/openhook", O_RDWR);
         write(fd, str, strlen(str)+1);
