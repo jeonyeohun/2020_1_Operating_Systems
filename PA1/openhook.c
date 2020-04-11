@@ -23,17 +23,16 @@ asmlinkage int (*orig_sys_open)(const char __user * filename, int flags, umode_t
 asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_t mode)
 {
 	char fname[256] ; // kernel memory space
-	if (command == 3){
-	printk("open-block is running.") ;
-	copy_from_user(fname, filename, 256) ; // bring filename which is trying to be openned now from user level to kernel level
+	if (command == 2){
+		printk("open-block is running....") ;
+		copy_from_user(fname, filename, 256) ; // bring filename which is trying to be openned now from user level to kernel level
 
-	if (filepath[0] != 0x0 && strstr(fname, filepath) != NULL) {
-		printk("start uid checking\n");
-		if(simple_strtol(usrid, NULL, 10) == (current->cred->uid.val)){	
-			printk("user id %d access the file %s", current->cred->uid.val, fname);	
-			return -1; // return open failure
+		if (filepath[0] != 0x0 && strstr(fname, filepath) != NULL) {
+			if(simple_strtol(usrid, NULL, 10) == (current->cred->uid.val)){	
+				printk("uid %d tries to access the file %s", current->cred->uid.val, fname);	
+				return -1; // return open failure
+			}	
 		}	
-	}	
 	}
 	
 	return orig_sys_open(filename, flags, mode) ; // open file normally
@@ -78,8 +77,8 @@ ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t s
 	if (copy_from_user(buf, ubuf, size))
 		return -EFAULT ;
 
-	sscanf(buf,"%d %s %s", &command, filepath, usrid) ;
-	printk("%d %s %s\n", command, filepath, usrid);
+	sscanf(buf,"%d %d %s", &command, filepath, usrid) ;
+	printk("%d %d %s\n", command, filepath, usrid);
 	
 	*offset = strlen(buf) ;
 
