@@ -18,27 +18,21 @@ char usrid[128] = { 0x0, } ; // indicate filename, given by user program
 void ** sctable ;
 int count = 0 ; // how many times the file opened 
 
-asmlinkage/*prefix for system call routine*/ int (*orig_sys_open/*function pointer*/)(const char __user * filename, int flags, umode_t mode)/*argument type of the function*/ ; 
+asmlinkage int (*orig_sys_open)(const char __user * filename, int flags, umode_t mode) ; 
 
 asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_t mode)
 {
 	char fname[256] ; // kernel memory space
 	copy_from_user(fname, filename, 256) ; // bring filename which is trying to be openned now from user level to kernel level
 
-	unsigned long ud, uid;
-	ud  = __kuid_val(current_uid());
-	uid = simple_strtol(usrid, NULL, 10);	
-
-
 	if (filepath[0] != 0x0 && strstr(fname, filepath) != NULL) {
 		printk("start uid checking\n");
-		if(ud == uid){	
-			printk("user id %u access the file %s", uid, fname);	
+		if(simple_strtol(usrid, NULL, 10) == (current->cred->uid.val)){	
+			printk("user id %d access the file %s", current->cred->uid.val, fname);	
 			return -1; // return open failure
 		}	
 	}	
 	
-//	printk("user id %u access the file %s", ud, fname);
 	return orig_sys_open(filename, flags, mode) ; // open file normally
 }
 
@@ -75,29 +69,19 @@ static
 ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t size, loff_t *offset) 
 {
 	char buf[256] ;
-	char argv[2][256];
-	
+	char command[256];
+
 	if (*offset != 0 || size > 128)
 		return -EFAULT ;
 
 	if (copy_from_user(buf, ubuf, size))
 		return -EFAULT ;
-	
-	
-	char *ptr = strtok(buf, " ");
-	int i = 0;
 
-	while(ptr != NULL){
-		argv[i++] = ptr;
-		ptr = strtok(NULL, " ");
-	}
-	usrid = argv[0];
-
-	if (i == 2){
-		filepath =  argv[1];
-		printk("%s %s\n", usrid, filepath);
-	}
+	sscanf(buf,"%s %s %s",command, filepath, usrid) ;
 	
+	printk("%s %s %s\n", command, filepath, usrid);
+	
+	count = 0 ;
 	*offset = strlen(buf) ;
 
 	return *offset ;
