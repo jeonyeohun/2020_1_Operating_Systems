@@ -1,6 +1,6 @@
 CONFIG_MODULE_SIG=n
 
-obj-m += openhook.o
+obj-m += mousehole.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules

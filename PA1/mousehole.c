@@ -6,50 +6,79 @@
 #include <linux/kallsyms.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <asm/unistd.h>
 #include <linux/cred.h>
+#include <linux/sched/signal.h>
+#include <asm/unistd.h>
+#include <linux/uidgid.h>
+#include <linux/string.h>
 
 MODULE_LICENSE("GPL");
 
 char filepath[128] = { 0x0, } ; // indicate filename, given by user program
+int uid;
 void ** sctable ;
-int count = 0 ; // how many times the file opened 
+int command = 0;
 
-asmlinkage/*prefix for system call routine*/ int (*orig_sys_open/*function pointer*/)(const char __user * filename, int flags, umode_t mode)/*argument type of the function*/ ; 
+asmlinkage int (*orig_sys_open)(const char __user * filename, int flags, umode_t mode) ; 
+asmlinkage long  (*orig_sys_kill)(pid_t pid, int sig);
 
-asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_t mode)
+asmlinkage long  mousehole_sys_kill (pid_t pid, int sig){
+	struct task_struct * t ;
+	/* Do this only when /proc has '3' in command varialbe */
+	if(command == 3){	
+		/* traverse all process  */
+		for_each_process(t){
+			// if the selected process is currently working process and the owner is same as given uid, the process should not be killed */
+			if(t->pid == pid && t->cred->uid.val == uid){ 
+				printk("The process %d(pid) owned by %d(uid) is protected. mousehole deny the kill.", pid, uid);
+				return -1; // return kill failure
+			}
+		}
+	}
+	return orig_sys_kill(pid, sig);
+}
+
+asmlinkage int mousehole_sys_open(const char __user * filename, int flags, umode_t mode)
 {
 	char fname[256] ; // kernel memory space
-
-	const struct cred *cred = current_cred();
-	
-	printk("user id with %d tried to access this file\n", cred->uid);
-	
-	if (filepath[0] != 0x0 && strcmp(filepath, fname) == 0) {
-		count++ ; // system open is invoked, and the open is target specific file that specified by user application, increase count
-		printk("user id with %d tried to access this file\n", cred->uid);
+	/* Do this only when /proc has '2' in command varialbe */
+	if (command == 2){
+		/* bring filename which is trying to be openned now from user level to kernel level */
+		copy_from_user(fname, filename, 256) ; 
+		if (filepath[0] != 0x0 && strstr(fname, filepath) != NULL) {
+			if(uid == (current->cred->uid.val)){	
+				printk("uid %d tries to access the file %s. mousehole deny the access.\n", current->cred->uid.val, fname);	
+				return -1; // return open failure
+			}	
+		}	
 	}
-	return orig_sys_open(filename, flags, mode) ; // 
+	
+	return orig_sys_open(filename, flags, mode) ; 
 }
 
 
 static 
-int openhook_proc_open(struct inode *inode, struct file *file) {
+int mousehole_proc_open(struct inode *inode, struct file *file) {
 	return 0 ;
 }
 
 static 
-int openhook_proc_release(struct inode *inode, struct file *file) {
+int mousehole_proc_release(struct inode *inode, struct file *file) {
 	return 0 ;
 }
 
 static
-ssize_t openhook_proc_read(struct file *file, char __user *ubuf, size_t size, loff_t *offset) 
+ssize_t mousehole_proc_read(struct file *file, char __user *ubuf, size_t size, loff_t *offset) 
 {
 	char buf[256] ;
 	ssize_t toread ;
 
-	sprintf(buf, "%s:%d\n", filepath, count) ;
+	if (command == 2){
+		sprintf(buf, "Mousehole module is currently protecting files contain \"%s\" in the filename from user with uid %d\n", filepath, uid) ;
+	}
+	if (command == 3){
+		sprintf(buf, "Mousehole module is currently protecting all processes created by user with uid %d from kill system call\n", uid) ;
+	}
 
 	toread = strlen(buf) >= *offset + size ? size : strlen(buf) - *offset ;
 
@@ -62,9 +91,9 @@ ssize_t openhook_proc_read(struct file *file, char __user *ubuf, size_t size, lo
 }
 
 static 
-ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t size, loff_t *offset) 
+ssize_t mousehole_proc_write(struct file *file, const char __user *ubuf, size_t size, loff_t *offset) 
 {
-	char buf[128] ;
+	char buf[256] ;
 
 	if (*offset != 0 || size > 128)
 		return -EFAULT ;
@@ -72,55 +101,62 @@ ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t s
 	if (copy_from_user(buf, ubuf, size))
 		return -EFAULT ;
 
-	sscanf(buf,"%s", filepath) ;
-	count = 0 ;
+	/* read written string from user buffer(jerry) */
+	sscanf(buf,"%d %d %s", &command, &uid, filepath) ;
+	
 	*offset = strlen(buf) ;
 
 	return *offset ;
 }
 
-static const struct file_operations openhook_fops = {
+static const struct file_operations mousehole_fops = {
 	.owner = 	THIS_MODULE,
-	.open = 	openhook_proc_open,
-	.read = 	openhook_proc_read,
-	.write = 	openhook_proc_write,
+	.open = 	mousehole_proc_open,
+	.read = 	mousehole_proc_read,
+	.write = 	mousehole_proc_write,
 	.llseek = 	seq_lseek,
-	.release = 	openhook_proc_release,
+	.release = 	mousehole_proc_release,
 } ;
 
 static 
-int __init openhook_init(void) {
+int __init mousehole_init(void) {
 	unsigned int level ; 
 	pte_t * pte ;
 
-	proc_create("openhook", S_IRUGO | S_IWUGO, NULL, &openhook_fops) ;
+	proc_create("mousehole", S_IRUGO | S_IWUGO, NULL, &mousehole_fops) ;
 
-	sctable = (void *) kallsyms_lookup_name("sys_call_table") ; // bring system call handler table
+	/* bring system call handler table */
+	sctable = (void *) kallsyms_lookup_name("sys_call_table") ; 
 
-	orig_sys_open = sctable[__NR_open] ; // the index of system call routine given by linux kernel(/include/linux/syscalls.h)
-
-	
+	/* save the original system call routine */
+	orig_sys_open = sctable[__NR_open] ; 
+	orig_sys_kill = sctable[__NR_kill];
 
 	pte = lookup_address((unsigned long) sctable, &level) ;
-	/*sctable is read only so we need to change the authorization temporarily*/
+
+	/* sctable is read only so we need to change the authorization temporarily */
 	if (pte->pte &~ _PAGE_RW) 
 		pte->pte |= _PAGE_RW ;	
 
-	sctable[__NR_open] = openhook_sys_open ; // change system call routine by defined function.
+	/* change system call routine by defined function. */
+	sctable[__NR_open] = mousehole_sys_open ; 
+	sctable[__NR_kill] = mousehole_sys_kill ;
 
 	return 0;
 }
 
 static 
-void __exit openhook_exit(void) { // restore original system call handler
+void __exit mousehole_exit(void) { 
 	unsigned int level ;
 	pte_t * pte ;
-	remove_proc_entry("openhook", NULL) ;
+	remove_proc_entry("mousehole", NULL) ;
 
+	/* restore all the system call table to original */
 	sctable[__NR_open] = orig_sys_open ;
+	sctable[__NR_kill] = orig_sys_kill ;
 	pte = lookup_address((unsigned long) sctable, &level) ;
 	pte->pte = pte->pte &~ _PAGE_RW ;
 }
 
-module_init(openhook_init);
-module_exit(openhook_exit);
+module_init(mousehole_init);
+module_exit(mousehole_exit);

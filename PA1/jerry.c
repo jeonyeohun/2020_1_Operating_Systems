@@ -15,6 +15,7 @@ int main (int argc, char *argv[] ){
     }
    char uname[256];
    char uid[256] ;
+   char buf[256];
    FILE *pf = NULL;
    
    /* make linux command with given username */
@@ -42,6 +43,7 @@ int main (int argc, char *argv[] ){
         /* write the string into /proc filesystem */
         int fd = open("/proc/openhook", O_RDWR);
         write(fd, str, strlen(str)+1);
+        read(fd, buf, 256);
     }
 
 
@@ -54,5 +56,6 @@ int main (int argc, char *argv[] ){
         /* write the string into /proc filesystem */
         int fd = open("/proc/openhook", O_RDWR);
         write(fd, str, strlen(str)+1);
+        read(fd, buf, 256);
     }
 }
