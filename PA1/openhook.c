@@ -14,7 +14,7 @@
 MODULE_LICENSE("GPL");
 
 char filepath[128] = { 0x0, } ; // indicate filename, given by user program
-char usrid[128] = { 0x0, } ; // indicate filename, given by user program
+int uid;
 void ** sctable ;
 int command = 0;
 
@@ -28,7 +28,7 @@ asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_
 		copy_from_user(fname, filename, 256) ; // bring filename which is trying to be openned now from user level to kernel level
 
 		if (filepath[0] != 0x0 && strstr(fname, filepath) != NULL) {
-			if(simple_strtol(usrid, NULL, 10) == (current->cred->uid.val)){	
+			if(uid == (current->cred->uid.val)){	
 				printk("uid %d tries to access the file %s", current->cred->uid.val, fname);	
 				return -1; // return open failure
 			}	
@@ -77,8 +77,8 @@ ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t s
 	if (copy_from_user(buf, ubuf, size))
 		return -EFAULT ;
 
-	sscanf(buf,"%d %d %s", &command, filepath, usrid) ;
-	printk("%d %d %s\n", command, filepath, usrid);
+	sscanf(buf,"%d %d %s", &command, &uid, filepath) ;
+	printk("%d %d %s\n", command, uid, filepath);
 	
 	*offset = strlen(buf) ;
 
