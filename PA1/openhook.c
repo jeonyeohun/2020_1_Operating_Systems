@@ -16,13 +16,15 @@ MODULE_LICENSE("GPL");
 char filepath[128] = { 0x0, } ; // indicate filename, given by user program
 char usrid[128] = { 0x0, } ; // indicate filename, given by user program
 void ** sctable ;
-int count = 0 ; // how many times the file opened 
+int command = 0;
 
 asmlinkage int (*orig_sys_open)(const char __user * filename, int flags, umode_t mode) ; 
 
 asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_t mode)
 {
 	char fname[256] ; // kernel memory space
+	if (command == 3){
+	printk("open-block is running.") ;
 	copy_from_user(fname, filename, 256) ; // bring filename which is trying to be openned now from user level to kernel level
 
 	if (filepath[0] != 0x0 && strstr(fname, filepath) != NULL) {
@@ -32,6 +34,7 @@ asmlinkage int openhook_sys_open(const char __user * filename, int flags, umode_
 			return -1; // return open failure
 		}	
 	}	
+	}
 	
 	return orig_sys_open(filename, flags, mode) ; // open file normally
 }
@@ -53,7 +56,6 @@ ssize_t openhook_proc_read(struct file *file, char __user *ubuf, size_t size, lo
 	char buf[256] ;
 	ssize_t toread ;
 
-	sprintf(buf, "%s %d\n", usrid, count) ;
 
 	toread = strlen(buf) >= *offset + size ? size : strlen(buf) - *offset ;
 
@@ -69,7 +71,6 @@ static
 ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t size, loff_t *offset) 
 {
 	char buf[256] ;
-	char command[256];
 
 	if (*offset != 0 || size > 128)
 		return -EFAULT ;
@@ -77,11 +78,9 @@ ssize_t openhook_proc_write(struct file *file, const char __user *ubuf, size_t s
 	if (copy_from_user(buf, ubuf, size))
 		return -EFAULT ;
 
-	sscanf(buf,"%s %s %s",command, filepath, usrid) ;
+	sscanf(buf,"%d %s %s", &command, filepath, usrid) ;
+	printk("%d %s %s\n", command, filepath, usrid);
 	
-	printk("%s %s %s\n", command, filepath, usrid);
-	
-	count = 0 ;
 	*offset = strlen(buf) ;
 
 	return *offset ;
