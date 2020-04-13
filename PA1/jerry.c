@@ -21,8 +21,14 @@ int main(int argc, char *argv[])
 	int fd = open("/proc/mousehole", O_RDWR);
 
 	/*if user did not put any arguments, print help message */
-	if (argc == 1 || strcmp(argv[1], "blockopen") || strcmp(argv[1], "blockill"))
+	if (argc == 1 )
 	{
+		help();
+		return 0;
+	}
+
+	if (strcmp(argv[1], "blockkill") && strcmp(argv[1], "blockopen"))
+	{	
 		help();
 		return 0;
 	}
@@ -73,8 +79,10 @@ int main(int argc, char *argv[])
 		/*write the string into /proc filesystem */
 		write(fd, str, strlen(str) + 1);
 	}
-
+	
 	char buf[256];
-	read(fd, buf, 256);
+	pf = popen("cat /proc/mousehole", "r");
+	fgets(buf, 256, pf);
+	buf[strlen(buf)-1] = '\0';
 	printf("%s\n", buf);
 }

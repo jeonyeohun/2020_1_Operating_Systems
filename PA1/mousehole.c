@@ -47,7 +47,7 @@ asmlinkage int mousehole_sys_open(const char __user * filename, int flags, umode
 		copy_from_user(fname, filename, 256) ; 
 		if (filepath[0] != 0x0 && strstr(fname, filepath) != NULL) {
 			if(uid == (current->cred->uid.val)){	
-				printk("uid %d tries to access the file %s. mousehole deny the access.", current->cred->uid.val, fname);	
+				printk("uid %d tries to access the file %s. mousehole deny the access.", current->cred->uid.val, filename);	
 				return -1; // return open failure
 			}	
 		}	
@@ -74,10 +74,10 @@ ssize_t mousehole_proc_read(struct file *file, char __user *ubuf, size_t size, l
 	ssize_t toread ;
 
 	if (command == 2){
-		sprintf(buf, "Module is currently protecting files contain \"%s\" in the filename from user with uid %d", filepath, uid) ;
+		sprintf(buf, "mousehole module is currently protecting files contain \"%s\" in the filename from user with uid %d", filepath, uid) ;
 	}
 	if (command == 3){
-		sprintf(buf, "Module is currently protecting all processes created by user with uid %d from kill system call", uid) ;
+		sprintf(buf, "mousehole module is currently protecting all processes created by user with uid %d from kill system call", uid) ;
 	}
 
 	toread = strlen(buf) >= *offset + size ? size : strlen(buf) - *offset ;
@@ -103,10 +103,10 @@ ssize_t mousehole_proc_write(struct file *file, const char __user *ubuf, size_t 
 
 	/* read written string from user buffer(jerry) */
 
-	if (buf[0] = '2'){
+	if (buf[0] == '2'){
 		sscanf(buf,"%d %d %s", &command, &uid, filepath) ;
 	}
-	if (buf[0] = '3'){
+	if (buf[0] == '3'){
 		sscanf(buf,"%d %d", &command, &uid) ;
 	}
 	
