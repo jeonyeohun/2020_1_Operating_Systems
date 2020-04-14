@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #define STR_MAX 256
 
@@ -18,16 +19,15 @@ void printHelp()
 int getUid (char * uname, char * uid){
 	FILE *pf = NULL;
 	char command[STR_MAX] = "id -u ";
-	char uid[STR_MAX];
 	
 	/*run the linux command and bring the result */
-	pf = popen(command, "r");
 	strcat(command, uname);
+	pf = popen(command, "r");
 	fgets(uid, STR_MAX, pf);
 	uid[strlen(uid) - 1] = '\0';
 
 	/* check if user put invalid username  */
-	for (int i = 0 ; i < stelen(uid) ; i++){
+	for (int i = 0 ; i < strlen(uid) ; i++){
 		if (!isdigit(uid[i])) return -1;
 	}
 	
@@ -43,22 +43,28 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	
-	/* Exception handler for invalid username */
-	if (getUid(argv[2], uid)){
-		printf("No such username in our system.\n");
-		return 0;
-	}
-
 	/* Open mousehole proc file system */
 	int fd = open("/proc/mousehole", O_RDWR);
 
 	/* Command #1: Release current protection. */
-	if (!strcmp(argv[1], "-ReleaseAll" && argc == 2)){
+	if (!strcmp(argv[1], "-ReleaseAll") && argc == 2){
+		char buf[STR_MAX];
 		write(fd, "1", 2);
+		int proc = open("/proc/mousehole", O_RDWR);
+		read(proc, buf, STR_MAX);
+		puts(buf);
+		return 0;
+	}
+	else{
+		/* Exception handler for invalid username */
+		if (getUid(argv[2], uid)){
+			printf("No such username in our system.\n");
+			return 0;
+		}
 	}
 
 	/* Command #2: Block opening file with specific substring from certain user */
-	else if (!strcmp(argv[1], "-BlockOpen") && argc == 4){
+	if (!strcmp(argv[1], "-BlockOpen") && argc == 4){
 		char fname[STR_MAX];
 		char msg[STR_MAX] = "2 ";	// command number to pass LKM to identify which option is selected
 		strcpy(fname, argv[3]);	// put given string to variable 
@@ -90,6 +96,7 @@ int main(int argc, char *argv[])
 	
 	/* Read proc file system to get status of mousehole */
 	char buf[STR_MAX];
-	read(fd, buf, STR_MAX);
+	int proc = open("/proc/mousehole", O_RDWR);
+	read(proc, buf, STR_MAX);
 	puts(buf);
 }

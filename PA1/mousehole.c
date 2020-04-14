@@ -74,7 +74,7 @@ ssize_t mousehole_proc_read(struct file *file, char __user *ubuf, size_t size, l
 	ssize_t toread ;
 
 	if (command == 1){
-		sprintf(buf, "Mousehole module is now ready for new protection.")
+		sprintf(buf, "Mousehole module is now ready for new protection.");
 	}
 	if (command == 2){
 		sprintf(buf, "Mousehole module is currently protecting files contain \"%s\" in the filename from user with uid %d", filepath, uid) ;
