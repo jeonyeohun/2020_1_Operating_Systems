@@ -73,11 +73,14 @@ ssize_t mousehole_proc_read(struct file *file, char __user *ubuf, size_t size, l
 	char buf[256] ;
 	ssize_t toread ;
 
+	if (command == 1){
+		sprintf(buf, "Mousehole module is now ready for new protection.")
+	}
 	if (command == 2){
-		sprintf(buf, "mousehole module is currently protecting files contain \"%s\" in the filename from user with uid %d", filepath, uid) ;
+		sprintf(buf, "Mousehole module is currently protecting files contain \"%s\" in the filename from user with uid %d", filepath, uid) ;
 	}
 	if (command == 3){
-		sprintf(buf, "mousehole module is currently protecting all processes created by user with uid %d from kill system call", uid) ;
+		sprintf(buf, "Mousehole module is currently protecting all processes created by user with uid %d from kill system call", uid) ;
 	}
 
 	toread = strlen(buf) >= *offset + size ? size : strlen(buf) - *offset ;
@@ -102,7 +105,9 @@ ssize_t mousehole_proc_write(struct file *file, const char __user *ubuf, size_t 
 		return -EFAULT ;
 
 	/* read written string from user buffer(jerry) */
-
+	if (buf[0] == '1'){
+		sscanf(buf, "%d", &command);
+	}
 	if (buf[0] == '2'){
 		sscanf(buf,"%d %d %s", &command, &uid, filepath) ;
 	}
