@@ -50,7 +50,9 @@ int main(int argc, char *argv[])
 	char uid[STR_MAX];
 	/* Exception handler for invalid command */
 	if (argc == 1 || (strcmp(argv[1], "-BlockKill") && strcmp(argv[1], "-BlockOpen") && strcmp(argv[1], "-ReleaseAll"))){
+		printf("invalid option\n");
 		printHelp();
+		
 		return 0;
 	}
 	
@@ -64,32 +66,38 @@ int main(int argc, char *argv[])
 		readProc();
 		return 0;
 	}
-	else{
+	
+	/* Command #2: Block opening file with specific substring from certain user */
+	else if (!strcmp(argv[1], "-BlockOpen") && argc == 4){
+		char fname[STR_MAX];
+		char msg[STR_MAX] = "2 ";	// command number to pass LKM to identify which option is selected
+		strcpy(fname, argv[3]);	// put given string to variable 
+
 		/* Exception handler for invalid username */
 		if (getUid(argv[2], uid)){
 			printf("No such username in our system.\n");
 			return 0;
 		}
-	}
-
-	/* Command #2: Block opening file with specific substring from certain user */
-	if (!strcmp(argv[1], "-BlockOpen") && argc == 4){
-		char fname[STR_MAX];
-		char msg[STR_MAX] = "2 ";	// command number to pass LKM to identify which option is selected
-		strcpy(fname, argv[3]);	// put given string to variable 
 
 		/*concat[command username filename] */
 		strcat(uid, " ");
 		strcat(uid, fname);
 		strcat(msg, uid);
+
 		/*write the string into /proc filesystem */
 		write(fd, msg, strlen(msg) + 1);
-		readProc();	
+		readProc();
+		return 0;	
 	}
-
 
 	/* Command #3: Block killing process that created by given user */
 	else if (!strcmp(argv[1], "-BlockKill") && argc == 3){
+
+		/* Exception handler for invalid username */
+		if (getUid(argv[2], uid)){
+			printf("No such username in our system.\n");
+			return 0;
+		}
 
 		/*concat[command username] */
 		char msg[STR_MAX] = "3 ";
@@ -98,12 +106,12 @@ int main(int argc, char *argv[])
 		/*write the string into /proc filesystem */
 		write(fd, msg, strlen(msg) + 1);
 		readProc();
+		return 0;
 	}
-
 	else{
-		printf("Invalid command.\n");
 		printHelp();
 		return 0;
 	}
-	
+
+	return 0;	
 }
