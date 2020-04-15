@@ -17,7 +17,7 @@ MODULE_LICENSE("GPL");
 char filepath[128] = { 0x0, } ; // indicate filename, given by user program
 int uid;
 void ** sctable ;
-int command = 0;
+int command = 1;
 
 asmlinkage int (*orig_sys_open)(const char __user * filename, int flags, umode_t mode) ; 
 asmlinkage long  (*orig_sys_kill)(pid_t pid, int sig);

@@ -9,7 +9,7 @@
 
 void printHelp()
 {
-	printf("usage:< -BlockOpen username filename | -BlockKill username | -ReleaseAll >\n");
+	printf("usage: jerry < -BlockOpen username filename | -BlockKill username | -ReleaseAll >\n");
 	printf("\t BlockOpen: Block user with given user name from opening file has given filename as substring\n");
 	printf("\t BlockKill: Make processes made by given user name never be killed by other process\n");
 	printf("\t ReleaseAll: Release the protection provided by Mousehole.\n");
@@ -17,21 +17,32 @@ void printHelp()
 
 /* convert username to uid */
 int getUid (char * uname, char * uid){
-	FILE *pf = NULL;
 	char command[STR_MAX] = "id -u ";
-	
+
 	/*run the linux command and bring the result */
 	strcat(command, uname);
+	strcat(command, " 2>&1");
+	FILE * pf = NULL;
 	pf = popen(command, "r");
-	fgets(uid, STR_MAX, pf);
-	uid[strlen(uid) - 1] = '\0';
 
-	/* check if user put invalid username  */
-	for (int i = 0 ; i < strlen(uid) ; i++){
+	/* check if user put invalid username */
+	fgets(uid, STR_MAX, pf);	
+	for (int i = 0 ; i < strlen(uid)-1 ; i++){
 		if (!isdigit(uid[i])) return -1;
-	}
+	}	
 	
+	pclose(pf);	
 	return 0;
+}
+
+/* Read proc file system to get status of mousehole */
+void readProc (){
+	char buf[STR_MAX];
+	int proc = open("/proc/mousehole", O_RDWR);
+	read(proc, buf, STR_MAX);
+	puts(buf);
+	close(proc);
+
 }
 
 int main(int argc, char *argv[])
@@ -50,9 +61,7 @@ int main(int argc, char *argv[])
 	if (!strcmp(argv[1], "-ReleaseAll") && argc == 2){
 		char buf[STR_MAX];
 		write(fd, "1", 2);
-		int proc = open("/proc/mousehole", O_RDWR);
-		read(proc, buf, STR_MAX);
-		puts(buf);
+		readProc();
 		return 0;
 	}
 	else{
@@ -73,10 +82,11 @@ int main(int argc, char *argv[])
 		strcat(uid, " ");
 		strcat(uid, fname);
 		strcat(msg, uid);
-
 		/*write the string into /proc filesystem */
 		write(fd, msg, strlen(msg) + 1);
+		readProc();	
 	}
+
 
 	/* Command #3: Block killing process that created by given user */
 	else if (!strcmp(argv[1], "-BlockKill") && argc == 3){
@@ -87,16 +97,13 @@ int main(int argc, char *argv[])
 
 		/*write the string into /proc filesystem */
 		write(fd, msg, strlen(msg) + 1);
+		readProc();
 	}
+
 	else{
 		printf("Invalid command.\n");
 		printHelp();
 		return 0;
 	}
 	
-	/* Read proc file system to get status of mousehole */
-	char buf[STR_MAX];
-	int proc = open("/proc/mousehole", O_RDWR);
-	read(proc, buf, STR_MAX);
-	puts(buf);
 }
