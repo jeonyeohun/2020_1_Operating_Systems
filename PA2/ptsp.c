@@ -29,27 +29,28 @@ int getNcities (char * arg){
 }
 
 /* Recursively traverse all the possible routes and calculate the length */
-void _travel (int idx){
+void _travel (int idx){   
+    int i;
     if (idx == size){                                // Traveling all the cities is done
-        length += cities[path[size-1]][path[0]];     // Add the last city length 
+        length += cities[path[size-1]][path[0]];     // Add the last city length 	
         if (min == -1 || min > length){              // Check if the length of current permuation is the best
-            min = length;                            // Set the best value
-            printf("[");
-            for (int i = 0 ; i < size ; i++){
-                printf("%d -> ", path[i]);
+            min = length;  
+            printf("%d (", length) ;
+			for (i = 0 ; i < size ; i++) {
+				printf("%d ", path[i]) ;
             }
-            printf("%d]", path[0]);
+			printf("%d)\n", path[0]) ;                          // Set the best value
         } 
         length -= cities[path[size-1]][path[0]];     // Remove the current city and return to try other permutation
     }
     else {
-        for (int i = 0 ; i < size ; i++){
+        for (i = 0 ; i < size ; i++){
             if (used[i] == 0){                       // Check if the route is already visited
                 path[idx] = i;                       // Record the order of visiting
                 used[i] = 1;                         // Mark as visited
                 length += cities[path[idx-1]][i];    // Add length
                 _travel(idx+1);                      // Move to the next city
-                length -= cities[path[idx=1]][i];    // Restore length to before visiting the city
+                length -= cities[path[idx-1]][i];    // Restore length to before visiting the city
                 used[i] = 0;                         // Reset the marking
             }
         }
@@ -61,7 +62,7 @@ void travel (int start){
     path[0] = start ;
     used[start] = 1;                    
     _travel(1);
-    used[start] = 0;
+    //used[start] = 0;
 }
 
 int main (int argc, char* argv []){
@@ -89,6 +90,7 @@ int main (int argc, char* argv []){
     while(1){ 
         /* Stop making new child when the number of current child is full and make until any child terminates */
         if (childLimit == childNum){
+            printf("wait\n");
             pid_t p = wait(NULL);
             printf("%d out\n", p);
             childNum--;                     // reduce the number of running process since child process is terminated and return code to wait().
@@ -103,6 +105,7 @@ int main (int argc, char* argv []){
             }
             /* Behavior of child process */
             else if (pid == 0){
+                printf("%d gets in to travel with point %d\n", getpid(), n);
                 travel(n);
                 printf("from %d, min is %d\n", getpid(), min);
                 exit(0);                  // exit() should be conducted. Otherwise, the child process keeps running in the infinite loop.
