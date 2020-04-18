@@ -9,9 +9,12 @@ int size;
 int length;
 int * used;
 int * path;
+int childLimit;
 int min = -1;
+pid_t pid;                      // Get pid after calling fork()
+int childNum = 0;               // Tracking the number of child process currently running
 
-
+/* Read line number from given file to figure out the number N */
 int getNcities (char * arg){
     FILE * fp = fopen(arg, "r");
     char temp[256];
@@ -25,50 +28,47 @@ int getNcities (char * arg){
     return line;
 }
 
+/* Recursively traverse all the possible routes and calculate the length */
 void _travel (int idx){
-    if (idx == size){
-        length += cities[path[size-1]][path[0]];
-        if (min == -1 || min > length){
-            min = length;
-
-            printf("%d (", length) ;
-            for (int i = 0 ; i < 17 ; i++)
-                printf("%d ", path[i]);
-            printf("%d)\n", path[0]);
+    if (idx == size){                                // Traveling all the cities is done
+        length += cities[path[size-1]][path[0]];     // Add the last city length 
+        if (min == -1 || min > length){              // Check if the length of current permuation is the best
+            min = length;                            // Set the best value
         } 
-        length -= cities[path[size-1]][path[0]];
+        length -= cities[path[size-1]][path[0]];     // Remove the current city and return to try other permutation
     }
     else {
-        for (int i = 0 ; i < 17 ; i++){
-            if (used[i] == 0){
-                path[idx] = i;
-                used[i] = 1;
-                length += cities[path[idx-1]][i];
-                _travel(idx+1);
-                length -= cities[path[idx=1]][i];
-                used[i] = 0;
+        for (int i = 0 ; i < size ; i++){
+            if (used[i] == 0){                       // Check if the route is already visited
+                path[idx] = i;                       // Record the order of visiting
+                used[i] = 1;                         // Mark as visited
+                length += cities[path[idx-1]][i];    // Add length
+                _travel(idx+1);                      // Move to the next city
+                length -= cities[path[idx=1]][i];    // Restore length to before visiting the city
+                used[i] = 0;                         // Reset the marking
             }
         }
     }
 }
 
+/* Back-tracking starter */
 void travel (int start){
     path[0] = start ;
-    used[start] = 1;
+    used[start] = 1;                    
     _travel(1);
     used[start] = 0;
 }
 
 int main (int argc, char* argv []){
     FILE * fp = fopen (argv[1], "r");
-    int childLimit = atoi(argv[2]);
+    childLimit = atoi(argv[2]);
     int i, j;
 
     size = getNcities(argv[1]);
-    path = (int *) malloc (sizeof(int) * size);
-    used = (int *) malloc (sizeof(int) * size);
+    path = (int *) malloc (sizeof(int) * size);     // Allocate memory for path recorder with the number of cities
+    used = (int *) malloc (sizeof(int) * size);     // Allocate memory for visi recorder with the number of cities
 
-
+    /* Put the length value into array from given tsp file */
     for (i = 0 ; i < size ; i++) {
         for (j = 0 ; j < size ; j++) {
             fscanf(fp, "%d", &cities[i][j]) ;
@@ -76,9 +76,7 @@ int main (int argc, char* argv []){
     }
     fclose(fp);
 
-    pid_t pids [childLimit], pid=1;
-    int childNum = 0;
-    int status;
+    
 
     /* Keep creating new child process */
     while(1){ 
@@ -86,12 +84,12 @@ int main (int argc, char* argv []){
         if (childLimit == childNum){
             pid_t p = wait(NULL);
             printf("%d out\n", p);
-            childNum--;
+            childNum--;                     // reduce the number of running process since child process is terminated and return code to wait().
         }
-        /* call fork() if there is space to make new child */   
+        /* Call fork() if there is space to make new child */   
         else{
-            pid = fork();
-            /* when forking fails */
+            pid = fork();                   // create new child process. Save the result of forking.
+            /* Fork fails */
             if (pid < 0){
                 printf("Failed\n");
                 exit(0);
@@ -100,7 +98,7 @@ int main (int argc, char* argv []){
             else if (pid == 0){
                 printf("%d in\n", getpid());
                 sleep(10);
-                exit(0);
+                exit(0);                  // exit() should be conducted. Otherwise, the child process keeps running in the infinite loop.
             }
             /* Behavior of parent process */
             else{
