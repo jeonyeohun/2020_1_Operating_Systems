@@ -10,7 +10,7 @@ int length;
 int * used;
 int * path;
 int min = -1;
-int childNum = 0;
+
 
 int getNcities (char * arg){
     FILE * fp = fopen(arg, "r");
@@ -76,21 +76,39 @@ int main (int argc, char* argv []){
     }
     fclose(fp);
 
-    pid_t p;
+    pid_t pids [childLimit], pid=1;
+    int childNum = 0;
+    int status;
 
-    if (p == 0){
-        printf("[son] pid %d from [parent] pid %d\n",getpid(),getppid()); 
-        exit(0); 
-    }
-    else{
-        printf("parent\n");
-        for (int i = 0 ; i < childLimit ; i++){
-           p = fork();
+    /* Keep creating new child process */
+    while(1){ 
+        /* Stop making new child when the number of current child is full and make until any child terminates */
+        if (childLimit == childNum){
+            pid_t p = wait(NULL);
+            printf("%d out\n", p);
+            childNum--;
         }
-        for (int i = 0 ; i < childLimit ; i++){
-           wait(NULL);
+        /* call fork() if there is space to make new child */   
+        else{
+            pid = fork();
+            /* when forking fails */
+            if (pid < 0){
+                printf("Failed\n");
+                exit(0);
+            }
+            /* Behavior of child process */
+            else if (pid == 0){
+                printf("%d in\n", getpid());
+                sleep(10);
+                exit(0);
+            }
+            /* Behavior of parent process */
+            else{
+                childNum++;
+            }
         }
     }
+
     
     printf("done\n");
     free (path);
