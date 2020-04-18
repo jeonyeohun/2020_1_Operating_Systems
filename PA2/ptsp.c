@@ -34,6 +34,11 @@ void _travel (int idx){
         length += cities[path[size-1]][path[0]];     // Add the last city length 
         if (min == -1 || min > length){              // Check if the length of current permuation is the best
             min = length;                            // Set the best value
+            printf("[");
+            for (int i = 0 ; i < size ; i++){
+                printf("%d -> ", path[i]);
+            }
+            printf("%d]", path[0]);
         } 
         length -= cities[path[size-1]][path[0]];     // Remove the current city and return to try other permutation
     }
@@ -76,6 +81,8 @@ int main (int argc, char* argv []){
     }
     fclose(fp);
 
+    int n = 0;
+
     
 
     /* Keep creating new child process */
@@ -96,13 +103,20 @@ int main (int argc, char* argv []){
             }
             /* Behavior of child process */
             else if (pid == 0){
-                printf("%d in\n", getpid());
-                sleep(10);
+                travel(n);
+                printf("from %d, min is %d\n", getpid(), min);
                 exit(0);                  // exit() should be conducted. Otherwise, the child process keeps running in the infinite loop.
             }
             /* Behavior of parent process */
             else{
                 childNum++;
+                n++;
+                if (n == size) {
+                    for (int i = 0 ; i < childLimit ; i++){
+                        wait(NULL);
+                    }
+                    break;
+                }
             }
         }
     }
