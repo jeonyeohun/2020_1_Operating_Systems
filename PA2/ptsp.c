@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 int cities[50][50];
 int size;
@@ -7,6 +10,7 @@ int length;
 int * used;
 int * path;
 int min = -1;
+int childNum = 0;
 
 int getNcities (char * arg){
     FILE * fp = fopen(arg, "r");
@@ -72,10 +76,23 @@ int main (int argc, char* argv []){
     }
     fclose(fp);
 
-    for (int i = 0 ; i < size ; i++){
-        travel(i);
-    }
+    pid_t p;
 
+    if (p == 0){
+        printf("[son] pid %d from [parent] pid %d\n",getpid(),getppid()); 
+        exit(0); 
+    }
+    else{
+        printf("parent\n");
+        for (int i = 0 ; i < childLimit ; i++){
+           p = fork();
+        }
+        for (int i = 0 ; i < childLimit ; i++){
+           wait(NULL);
+        }
+    }
+    
+    printf("done\n");
     free (path);
     free (used);
 
