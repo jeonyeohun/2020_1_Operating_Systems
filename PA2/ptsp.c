@@ -13,6 +13,23 @@ int childLimit;
 int min = -1;
 pid_t pid = 1;                      // Get pid after calling fork()
 int childNum = 0;               // Tracking the number of child process currently running
+int pnum = 0;
+int pipes[2] ;
+
+
+void parent_proc (){
+    close(pipes[1]);
+    write(pipes[0], &min, sizeof(min));
+    printf("Parent(%d) recieved value: %d\n", getpid(), min);
+    
+}
+
+void child_proc(){
+    close(pipes[0]);
+    write(pipes[1], &min, sizeof(min));
+    printf("Child(%d) send value: %d\n", getpid(), min);
+}
+
 
 /* Read line number from given file to figure out the number N */
 int getNcities (char * arg){
@@ -28,29 +45,46 @@ int getNcities (char * arg){
     return line;
 }
 
+void printPermu(){
+    printf("%d (", length) ;
+	for (int i = 0 ; i < size ; i++) {
+		printf("%d ", path[i]) ;
+    }
+	printf("%d) by %d\n", path[0], getpid()) ; 
+}
+
 /* Recursively traverse all the possible routes and calculate the length */
 void _travel (int idx){   
     int i;
     
     if (idx == size){                                // Traveling all the cities is done
         length += cities[path[size-1]][path[0]];     // Add the last city length 	
+        printPermu();
         if (min == -1 || min > length){              // Check if the length of current permuation is the best
-            min = length;  
-            printf("%d (", length) ;
-			for (i = 0 ; i < idx ; i++) {
-				printf("%d ", path[i]) ;
-            }
-			printf("%d ) by %d\n", path[0], getpid()) ; 
-                                     // Set the best value
+            min = length;                    // Set the best value
         } 
-        
         length -= cities[path[size-1]][path[0]];     // Remove the current city and return to try other permutation
     }
-
-
     else {
-        for (i = 0 ; i < size ; i++){
-            if (pid ==0){
+        for (int i = 0 ; i < size ; i++){
+            if (pid > 0) {
+                pid = fork();
+            }
+            
+            if (pid > 0) {
+                childNum++;
+                pnum++;
+                if (childNum == childLimit){
+                    pid_t p = wait(NULL);
+          //          parent_proc();
+                    childNum--;                    
+                }
+            }
+            else if (pid == -1){
+                printf("fork failed");
+                exit(-1);
+            }
+            else if (pid == 0){
                 if (used[i] == 0){                       // Check if the route is already visited
                     path[idx] = i;                       // Record the order of visiting
                     used[i] = 1;                         // Mark as visited
@@ -58,19 +92,8 @@ void _travel (int idx){
                     _travel(idx+1);                      // Move to the next city
                     length -= cities[path[idx-1]][i];    // Restore length to before visiting the city
                     used[i] = 0;                         // Reset the marking
-                }
-            }
-            else{    
-                pid = fork();
-                printf("%d in\n", getpid());
-                childNum++;
-                if (childNum == childLimit){
-                    printf("the process pool is full");
-                    pid_t p = wait(NULL);
-                    printf("%d out\n", getpid());
-                    childNum--;                     // reduce the number of running process since child process is terminated and return code to wait().
-                }
-            }
+                }       
+            }   
         }
     }
 }
@@ -82,6 +105,7 @@ void travel (int start){
     _travel(1);
     used[start] = 0;
     if (pid == 0){
+       // child_proc();
         exit(0);
     }
 }
@@ -103,16 +127,21 @@ int main (int argc, char* argv []){
     }
     fclose(fp);
 
-    int n = 0;
+    pipe(pipes);
 
+    printf("Parent: %d ", getpid());
     for (int i = 0 ; i < size ; i++){
-        travel(i++);
+        travel(i);
     }
     
+    for (int i = 0 ; i < childLimit ; i++){
+            wait(NULL);
+    }
     
-    printf("done\n");
+    printf("All child processes are cleared.\n");
+    printf("The total number of child processes used: %d\n", pnum);
+    
     free (path);
     free (used);
-
     return 0;
 }
