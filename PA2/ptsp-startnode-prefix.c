@@ -68,7 +68,8 @@ void _travel (int idx){
         length -= cities[path[size-1]][path[0]];     // Remove the current city and return to try other permutation
     }
     else {
-        for (i = 0 ; i < size ; i++){
+        for (i = 1; i < size-1 ; i++){
+            //if (i == 0) continue;
             if (used[i] == 0){                       // Check if the route is already visited
                 path[idx] = i;                       // Record the order of visiting
                 used[i] = 1;                         // Mark as visited
@@ -111,7 +112,7 @@ int main (int argc, char* argv []){
     }
 
     /* Keep creating new child process */
-    for(int i = 0 ; i < size ; i++){ 
+    for(int i = 1 ; i < size ; i++){ 
         /* Stop making new child when the number of current child is full and make until any child terminates */
         if (pid > 0) {
             childNum++;

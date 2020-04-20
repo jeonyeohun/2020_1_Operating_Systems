@@ -4,30 +4,56 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-int cities[50][50];
+int cities[51][51];
 int size;
+
 int length;
-int * used;
-int * path;
-int childLimit;
 int min = -1;
+
+int * used;
+int * task;
+int * path;
+
+pid_t  childList[12] = {0,};
+
+int childLimit;
+
 pid_t pid = 1;                      // Get pid after calling fork()
 int childNum = 0;               // Tracking the number of child process currently running
-int pnum = 0;
-int pipes[2] ;
 
+int pipes[24] ;
 
-void parent_proc (){
-    close(pipes[1]);
-    write(pipes[0], &min, sizeof(min));
-    printf("Parent(%d) recieved value: %d\n", getpid(), min);
+void printChild(){
     
+    for (int i = 0 ; i < childLimit ; i++){
+        printf("%d ", childList[i]);
+    }
+    printf("\n");
 }
 
-void child_proc(){
-    close(pipes[0]);
-    write(pipes[1], &min, sizeof(min));
+void parent_proc (int f){
+    for (int i=0 ; i < childLimit ; i++){
+        if (childList[i] == f) f = i;
+    }
+    printf("P: %d\n", f);
+    close(pipes[2*f+1]);
+    read(pipes[2*f], &min, sizeof(min));
+    printf("Parent(%d) recieved value: %d\n", getpid(), min);
+
+    close(pipes[2*f]);
+}
+
+void child_proc(int f){
+    printChild();
+    for (int i=0 ; i < childLimit ; i++){
+        if (childList[i] == f) f = i;
+    }
+    printf("C: %d\n", f);
+    close(pipes[2*f]);
+    write(pipes[2*f+1], &min, sizeof(min));
     printf("Child(%d) send value: %d\n", getpid(), min);
+
+    close(pipes[2*f+1]);
 }
 
 
@@ -59,25 +85,52 @@ void _travel (int idx){
     
     if (idx == size){                                // Traveling all the cities is done
         length += cities[path[size-1]][path[0]];     // Add the last city length 	
-        printPermu();
+        //printPermu();
         if (min == -1 || min > length){              // Check if the length of current permuation is the best
             min = length;                    // Set the best value
         } 
         length -= cities[path[size-1]][path[0]];     // Remove the current city and return to try other permutation
+        //exit(0);
     }
+
     else {
         for (int i = 0 ; i < size ; i++){
             if (pid > 0) {
                 pid = fork();
-            }
-            
+            }    
             if (pid > 0) {
                 childNum++;
-                pnum++;
+                for (int i = 0 ; i < childLimit ; i++){
+                    if (childList[i] == 0) {
+                        childList[i] = pid;
+                        break;
+                    }
+                }
+
+                printChild();
+
                 if (childNum == childLimit){
                     pid_t p = wait(NULL);
-          //          parent_proc();
+                    printf("%d out\n", p);
+                    parent_proc(p);
+                    for (int i = 0 ; i < childLimit ; i++){
+                        if (childList[i] == p) {
+                            childList[i] = 0;
+                            break;
+                        }
+                    }
                     childNum--;                    
+                } else{ 
+                    for (int i = 0 ; i < childNum ; i++){
+                        pid_t pd = waitpid(childList[i], NULL, WNOHANG);
+                        if (pd > 0 && childList[i] == pd) {
+                            parent_proc(pd);
+                            //printf("%d out\n", pd);
+                            childList[i] = 0;
+                            childNum--;
+                            break;
+                        }
+                    }
                 }
             }
             else if (pid == -1){
@@ -85,6 +138,12 @@ void _travel (int idx){
                 exit(-1);
             }
             else if (pid == 0){
+                for (int i = 0 ; i < childLimit ; i++){
+                    if (childList[i] == 0) {
+                        childList[i] = getpid();
+                        break;
+                    }
+                }
                 if (used[i] == 0){                       // Check if the route is already visited
                     path[idx] = i;                       // Record the order of visiting
                     used[i] = 1;                         // Mark as visited
@@ -105,7 +164,7 @@ void travel (int start){
     _travel(1);
     used[start] = 0;
     if (pid == 0){
-       // child_proc();
+        child_proc(getpid());
         exit(0);
     }
 }
@@ -115,9 +174,12 @@ int main (int argc, char* argv []){
     childLimit = atoi(argv[2]);
     int i, j;
 
+    printf("parent: %d\n\n", getpid());
+
     size = getNcities(argv[1]);
     path = (int *) malloc (sizeof(int) * size);     // Allocate memory for path recorder with the number of cities
     used = (int *) malloc (sizeof(int) * size);     // Allocate memory for visi recorder with the number of cities
+    task = (int *) malloc (sizeof(int) * size);
 
     /* Put the length value into array from given tsp file */
     for (i = 0 ; i < size ; i++) {
@@ -127,21 +189,22 @@ int main (int argc, char* argv []){
     }
     fclose(fp);
 
-    pipe(pipes);
+    for (int i = 0 ; i <= childLimit ; i++){
+        pipe(&pipes[2*i]);
+    }
 
-    printf("Parent: %d ", getpid());
     for (int i = 0 ; i < size ; i++){
         travel(i);
     }
     
     for (int i = 0 ; i < childLimit ; i++){
-            wait(NULL);
+        wait(NULL);
     }
     
     printf("All child processes are cleared.\n");
-    printf("The total number of child processes used: %d\n", pnum);
     
     free (path);
+    free (task);
     free (used);
     return 0;
 }
