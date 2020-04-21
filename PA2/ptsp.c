@@ -5,106 +5,97 @@
 #include <sys/wait.h>
 #include <time.h>
 
-int cities[51][51];
-int used [51];
-int path [51];
-int size;
-int taskPrefix;
-int results [51];
+int cities[51][51];                 // Map of city distance
+int used [51];                      // Mark visited city
+int path [51];                      // Record route
+int size;                           // The total number of cities
+int taskPrefix;                     // Task prefix. This prefix will be the identifier of single process
+int results [51];                   
 
-int length;
-int min = -1;
-int checkedRoute = 0;
-int tasks [51];
+int length;                         // Current weight of distance
+int min = -1;                       // Store minimum distance of traversed route
+int checkedRoute = 0;               // Number of checked route by single process
 
 pid_t pid = 1;                      // Get pid after calling fork()
-pid_t child;
 
-int childLimit;
-int childNum = 0;               // Tracking the number of child process currently running
-
-int pipes[26] ;
+int childLimit;                     // The Maximum number of child process 
+int childNum = 0;                   // Tracking the number of child process currently running
+int pipes[26] ;                     // Number of pipes each process will have a pair of pipes one for read, one for write
 
 void parent_proc (int f){
-    //printf("%d\n", f);
     close(pipes[2*f+1]);
-    int n, c, m;
+    int n, m;
     read(pipes[2*f], &n, sizeof(min));
     read(pipes[2*f], &m, sizeof(min));
-    read(pipes[2*f], &c, sizeof(min));
 
     results[n] = m;
-    printf("Parent(%d) recieved value: %d from %d\n", getpid(), m, c);
-
     close(pipes[2*f]);
 }
 
 void child_proc(int f){
     close(pipes[2*f]);
-    child = getpid();
     write(pipes[2*f+1], &taskPrefix, sizeof(min));
     write(pipes[2*f+1], &min, sizeof(min));
-    write(pipes[2*f+1], &child, sizeof(min));
-    printf("Child(%d) send value: %d \n", getpid(), min);
 
     close(pipes[2*f+1]);
 }
-
 
 /* Read line number from given file to figure out the number N */
 int getNcities (char * arg){
     FILE * fp = fopen(arg, "r");
     char temp[256];
-    int line = 0 ;
-    
-    while(fgets(temp, 256, fp)!=NULL){
+    int line = 0;
+
+    while(fgets(temp, 256, fp) != NULL){
         line++;
-    }
-    
+    } 
+
     fclose(fp);
     return line;
 }
 
+/* Print permutation */
 void printPermu(){
-    printf("%d (", length) ;
+    printf("%d (", length);
 	for (int i = 0 ; i < size ; i++) {
-		printf("%d ", path[i]) ;
+		printf("%d ", path[i]);
     }
-	printf("%d) by %d\n", path[0], getpid()) ; 
+	printf("%d) by %d\n", path[0], getpid()); 
 }
-
 
 /* Recursively traverse all the possible routes and calculate the length */
 void _travel (int idx){     
-    if (idx == size){                                // Traveling all the cities is done
-        length += cities[path[size-1]][path[0]];     // Add the last city length 	
-        printPermu();
-        checkedRoute++;
-        if (min == -1 || min > length){              // Check if the length of current permuation is the best
-            min = length;                    // Set the best value
+    if (idx == size){                                   // Traveling all the cities is done
+        length += cities[path[size-1]][path[0]];        // Add the last city length 	
+        printPermu();                                   // Print route 
+        checkedRoute++;                                 // Number of routes that the child process traversed  
+        if (min == -1 || min > length){                 // Check if the length of current permuation is the best
+            min = length;                               // Set the best value
         } 
-        length -= cities[path[size-1]][path[0]];     // Remove the current city and return to try other permutation
+        length -= cities[path[size-1]][path[0]];        // Remove the current city and return to try other permutation
     }
-
     else {
         for (int i = 1 ; i < size ; i++){
+            /* Main process behavior */
             if (pid > 0) {
-                if ((pid = fork()) < 0) idx++;
+                if ((pid = fork()) < 0) idx++ ;
                 taskPrefix = i;
                 childNum++;
-                tasks[taskPrefix] = pid;
-            }    
-            if (pid > 0) {
-                if (childNum == childLimit){
-                    pid_t p = wait(NULL);
-                    childNum--;        
-                }  
-                      
             }
+            /* Main process checker */    
+            if (pid > 0) {
+                /* Wait if the number of child process is max */
+                if (childNum == childLimit){
+                    wait(NULL) ;
+                    childNum-- ;        
+                }              
+            }
+            /* If forking fails, terminates */
             else if (pid == -1){
                 printf("fork failed");
                 exit(-1);
             }
+            /* Child process behavior */
             else if (pid == 0){
                 if (used[i] == 0){                       // Check if the route is already visited
                     path[idx] = i;                       // Record the order of visiting
@@ -112,12 +103,11 @@ void _travel (int idx){
                     length += cities[path[idx-1]][i];    // Add length
                     _travel(idx+1);                      // Move to the next city
                     length -= cities[path[idx-1]][i];    // Restore length to before visiting the city
-                    if (i == taskPrefix) return;
+                    if (i == taskPrefix) return;         // If the backtracking comes back to the prefix, terminates child
                     used[i] = 0;                         // Reset the marking
                 }       
             }   
         }
-        return;
     }
 }
 
@@ -137,6 +127,7 @@ int main (int argc, char* argv []){
     childLimit = atoi(argv[2]);
     int i, j;
 
+    /* Get number of cities */
     size = getNcities(argv[1]);
 
     /* Put the length value into array from given tsp file */
@@ -147,20 +138,20 @@ int main (int argc, char* argv []){
     }
     fclose(fp);
 
+    /* Allocate pipes */
     for (int i = 0 ; i <13 ; i++){
         pipe(&pipes[2*i]);
     }
     time_t start = time(NULL);
+
+    /* Start traverse routes from 0 */
     travel(0);
     
     for (int i = 1 ; i <= size ; i++){
-        wait(NULL);
+        wait(NULL);                         // Wait for all children are teminated
+        parent_proc(i);                     // Read data from pipes 
     }
     
-    for (int i = 1 ; i < size ; i++){
-        parent_proc(i);
-    }
-
     for (int i = 1 ; i < size ; i++){
         printf("%d ", results[i]);
     }
