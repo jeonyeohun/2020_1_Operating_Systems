@@ -3,64 +3,65 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <time.h>
-#include <string.h>
+#include <memory.h>
 
 int cities[51][51];                 // Map of city distance
 int used [51];                      // Mark visited city
 int path [51];                      // Record route
+int minpath [51] = {0,};            // The best path for the shortest distance
 int size;                           // The total number of cities
 int taskPrefix;                     // Task prefix. This prefix will be the identifier of single process
 
 int length;                         // Current weight of distance
-int min = INT32_MAX;                       // Store minimum distance of traversed route
-int minpath [51] = {0,};
-int checkedRoute=0;               // Number of checked route by single process
+int min = INT32_MAX;                // Store minimum distance of traversed route
+
+int checkedRoute=0;                 // Number of checked route by single process
 
 pid_t pid = 1;                      // Get pid after calling fork()
 
 int childLimit;                     // The Maximum number of child process 
 int childNum = 0;                   // Tracking the number of child process currently running
-int pipes[101] ;                     // Number of pipes each process will have a pair of pipes one for read, one for write
+int * pipes;                        // Number of pipes each process will have a pair of pipes one for read, one for write
 
-int kill = 0;
+int kill = 0;                       // flag variable to distinguish user sent SIGINT
 
-void printPermu();
+void parent_proc (int idx){
+    close(pipes[2*idx+1]);                                                    // Close write pipe
 
-void parent_proc (int f){
-    close(pipes[2*f+1]);
-    int m;
-    int p [51];
-    int nr;
-    read(pipes[2*f], &m, sizeof(min));
-    read(pipes[2*f], &nr, sizeof(nr));
-    for (int i = 0 ; i < size ; i++){
-        read(pipes[2*f], &p[i], sizeof(int));
+    int childMin;  
+    int childCheckedRoute;
+    int childMinPath [51];
+    
+    read(pipes[2*idx], &childMin, sizeof(min));                               // Read min distance from connected child
+    read(pipes[2*idx], &childCheckedRoute, sizeof(childCheckedRoute));        // Read number of routes from connected child
+    for (int i = 0 ; i < size ; i++){           
+        read(pipes[2*idx], &childMinPath[i], sizeof(childMinPath[0]));        // Read minpath from connected child
     }
     
-    checkedRoute += nr;
+    checkedRoute += childCheckedRoute;                                        // Update total number of checked routes.
 
-    if (min > m){
-        min = m;
-        memcpy(minpath, p, sizeof(p[0]) * size );
+    if (min > childMin){                                                      
+        min = childMin;                                                       // Update the min distance in main process
+        memcpy(minpath, childMinPath, sizeof(childMinPath[0]) * size);        // Update the min path in main process
     }
     
-    close(pipes[2*f]);
+    close(pipes[2*idx]);                                                        // Close read pipe
 }
 
-void child_proc(int f){
-    close(pipes[2*f]);
-    write(pipes[2*f+1], &min, sizeof(min));
-    write(pipes[2*f+1], &checkedRoute, sizeof(checkedRoute));
-    write(pipes[2*f+1], minpath, sizeof(minpath));
+/* write min, # of checked route, path of the min distance to pipe */
+void child_proc(int idx){
+    close(pipes[2*idx]);                                           // close reading pipe
+
+    write(pipes[2*idx+1], &min, sizeof(min));
+    write(pipes[2*idx+1], &checkedRoute, sizeof(checkedRoute));
+    write(pipes[2*idx+1], minpath, sizeof(minpath));
     
-    close(pipes[2*f+1]);
+    close(pipes[2*idx+1]);                                         // close writing pipe 
     
 }
-
 
 /* Read line number from given file to figure out the number N */
-int getNcities (char * arg){
+int getNcities (char * arg){        
     FILE * fp = fopen(arg, "r");
     char temp[256];
     int line = 0;
@@ -73,9 +74,10 @@ int getNcities (char * arg){
     return line;
 }
 
-/* Print permutation */
-void printPermu(){
-    printf("%d (", min);
+/* Print min distance, path and number of checked route */
+void printResult(){
+    printf("The shortest distance: %d\n", min);
+    printf("Path: (");
 	for (int i = 0 ; i < size ; i++) {
 		printf("%d ", minpath[i]);
     }
@@ -83,57 +85,52 @@ void printPermu(){
     printf("The number of checked route is %d.\n", checkedRoute);
 }
 
-void sigintHandler (int sig){
-    if (pid == 0){
-        kill = 1;
-        return;
+/* Catch invoked signals */
+void sigintHandler (int sig){                
+    /* Child process behavior when signal passed */ 
+    if (pid == 0){                           
+        kill = 1;                               // Change kill flag to true
+        return;                                 // Get back to work
     }
     else{
         for (int i = 1 ; i < size ; i++){
             wait(NULL);                         // Wait for all children are teminated
+            parent_proc(i);                     // Read data from pipes with each children's file director
         }
-
-        for (int i = 1 ; i < size ; i++){
-            parent_proc(i);                     // Read data from pipes 
-        }
-        printPermu();
-        exit(0);
+        printResult();                          // Print the result
+        exit(0);                                // Terminate main process
     }
 }
 
 /* Recursively traverse all the possible routes and calculate the length */
 void _travel (int idx){     
-    if (idx == size){                                   // Traveling all the cities is done
-        length += cities[path[size-1]][path[0]];        // Add the last city length 	
-        checkedRoute+=1;                                 // Number of routes that the child process traversed  
-        
-        if (min > length){                 // Check if the length of current permuation is the best    
-            min = length;                               // Set the best value
-            memcpy(minpath, path, sizeof(path[0]) * size );
+    if (idx == size){     
+        length += cities[path[size-1]][path[0]];             // Add the last city length 	
+        checkedRoute++;                                      // Number of routes that the child process traversed  
+        if (min > length){                                   // Check if the length of current permuation is the best    
+            min = length;                                    // Set the best value
+            memcpy(minpath, path, sizeof(path[0]) * size );  // Save the best path
         } 
-        length -= cities[path[size-1]][path[0]];        // Remove the current city and return to try other permutation
-        if (kill == 1) {
-            child_proc(taskPrefix);
-            exit(0);
+        length -= cities[path[size-1]][path[0]];             // Remove the current city and return to try other permutation
+        if (kill == 1) {                                     // SINGINT signal is passed. Child processes needs to be terminated after trying last combination
+            child_proc(taskPrefix);                          // Write data of current state into pipe
+            exit(0);                                         // Terminate child process
         }
     }
     else {
         for (int i = 1 ; i < size ; i++){
             /* Main process behavior */
             if (pid > 0) {
-                if ((pid = fork()) < 0) {
-                    checkedRoute = 0;
-                    idx++ ;
-                }
-                taskPrefix = i;
-                childNum++;
+                pid = fork();                               // Create child process
+                taskPrefix = i;                             // Set prefix to the child
+                childNum++;                                 // Update the number of the child process
             }
-            /* Main process checker */    
+            /* Process limit checker */    
             if (pid > 0) {
                 /* Wait if the number of child process is max */
-                if (childNum == childLimit){
-                    wait(NULL) ;
-                    childNum-- ;        
+                if (childNum == childLimit){                // Check if the current process is up to the limit
+                    wait(NULL);                            // Wait for any child finishes his work
+                    childNum--;                            // Update the number of child right after any child terminates
                 }              
             }
             /* If forking fails, terminates */
@@ -157,13 +154,13 @@ void _travel (int idx){
     }
 }
 
-/* Back-tracking starter */
+/* Traverse starter */
 void travel (int start){
-    path[0] = start ;
+    path[0] = start;
     used[start] = 1;                    
     _travel(1);
     if (pid == 0){
-        child_proc(taskPrefix);
+        child_proc(taskPrefix);                         // if child finishes his task, write data into given pipe and terminates
         exit(0);
     }
 }
@@ -171,25 +168,25 @@ void travel (int start){
 int main (int argc, char* argv []){
     FILE * fp = fopen (argv[1], "r");
     childLimit = atoi(argv[2]);
-    signal(SIGINT, sigintHandler);
-    int i, j;
+    signal(SIGINT, sigintHandler);                      // set signal handler for SIGINT with defined function
 
     /* Get number of cities */
     size = getNcities(argv[1]);
 
     /* Put the length value into array from given tsp file */
-    for (i = 0 ; i < size ; i++) {
-        for (j = 0 ; j < size ; j++) {
+    for (int i = 0 ; i < size ; i++) {
+        for (int j = 0 ; j < size ; j++) {
             fscanf(fp, "%d", &cities[i][j]) ;
         }
     }
+
     fclose(fp);
 
-    /* Allocate pipes */
-    for (int i = 0 ; i <=size ; i++){
+    /* Allocate and initialize pipes */
+    pipes = (int*)malloc(sizeof(int) * size*2);
+    for (int i = 0 ; i <size ; i++){
         pipe(&pipes[2*i]);
     }
-    time_t start = time(NULL);
 
     /* Start traverse routes from 0 */
     travel(0);
@@ -199,11 +196,7 @@ int main (int argc, char* argv []){
         parent_proc(i);                     // Read data from pipes 
     }
 
-    printPermu();
+    printResult();
 
-    printf("All child processes are cleared.\n");
-    time_t end = time(NULL);
-    printf("The computing time is: %ld seconds \n", (end-start));
-    
     return 0;
 }
