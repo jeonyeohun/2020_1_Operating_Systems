@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <memory.h>
+#include <limits.h>
 
 int cities[51][51];                 // Map of city distance
 int used [51];                      // Mark visited city
@@ -13,7 +14,7 @@ int size;                           // The total number of cities
 int taskPrefix;                     // Task prefix. This prefix will be the identifier of single process
 
 int length;                         // Current weight of distance
-int min = INT32_MAX;                // Store minimum distance of traversed route
+int min = INT_MAX;                // Store minimum distance of traversed route
 
 int checkedRoute=0;                 // Number of checked route by single process
 
@@ -23,7 +24,7 @@ int childLimit;                     // The Maximum number of child process
 int childNum = 0;                   // Tracking the number of child process currently running
 int * pipes;                        // Number of pipes each process will have a pair of pipes one for read, one for write
 
-int kill = 0;                       // flag variable to distinguish user sent SIGINT
+int killFlag = 0;                       // flag variable to distinguish user sent SIGINT
 
 void parent_proc (int idx){
     close(pipes[2*idx+1]);                                                    // Close write pipe
@@ -76,7 +77,7 @@ int getNcities (char * arg){
 
 /* Print min distance, path and number of checked route */
 void printResult(){
-    printf("The shortest distance: %d\n", min);
+    printf("\nThe shortest distance: %d\n", min);
     printf("Path: (");
 	for (int i = 0 ; i < size ; i++) {
 		printf("%d ", minpath[i]);
@@ -89,7 +90,7 @@ void printResult(){
 void sigintHandler (int sig){                
     /* Child process behavior when signal passed */ 
     if (pid == 0){                           
-        kill = 1;                               // Change kill flag to true
+        killFlag = 1;                               // Change kill flag to true
         return;                                 // Get back to work
     }
     else{
@@ -112,7 +113,7 @@ void _travel (int idx){
             memcpy(minpath, path, sizeof(path[0]) * size );  // Save the best path
         } 
         length -= cities[path[size-1]][path[0]];             // Remove the current city and return to try other permutation
-        if (kill == 1) {                                     // SINGINT signal is passed. Child processes needs to be terminated after trying last combination
+        if (killFlag == 1) {                                     // SINGINT signal is passed. Child processes needs to be terminated after trying last combination
             child_proc(taskPrefix);                          // Write data of current state into pipe
             exit(0);                                         // Terminate child process
         }
