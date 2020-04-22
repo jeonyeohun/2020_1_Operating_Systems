@@ -30,7 +30,7 @@ void parent_proc (int idx){
     close(pipes[2*idx+1]);                                                    // Close write pipe
 
     int childMin;  
-    int childCheckedRoute;
+    long long childCheckedRoute;
     int childMinPath [51];
     
     read(pipes[2*idx], &childMin, sizeof(min));                               // Read min distance from connected child
@@ -84,7 +84,7 @@ void printResult(){
     }
 	printf("%d)\n", minpath[0]); 
     printf("The number of checked route is %lld.\n", checkedRoute);
-    int k = 0;
+    
 }
 
 /* Catch invoked signals */
