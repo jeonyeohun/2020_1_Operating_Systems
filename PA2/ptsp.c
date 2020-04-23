@@ -20,21 +20,21 @@ int min = INT_MAX;                  // Store minimum distance of traversed route
 long long checkedRoute=0;           // Number of checked route by single process
 
 pid_t pid = 1;                      // Get pid by calling fork()
-int * pipes;                        // Number of pipes each process will have a pair of pipes one for read, one for write
+int pipes[2];                        // Number of pipes each process will have a pair of pipes one for read, one for write
 
 int killFlag = 0;                   // flag variable to distinguish user sent SIGINT
 
-void parent_proc (int idx){
-    close(pipes[2*idx+1]);                                                    // Close write pipe
+void parent_proc (){
+    close(pipes[1]);                                                    // Close write pipe
 
     int childMin;  
     long long childCheckedRoute;
     int childMinPath [51];
     
-    read(pipes[2*idx], &childMin, sizeof(min));                               // Read min distance from connected child
-    read(pipes[2*idx], &childCheckedRoute, sizeof(childCheckedRoute));        // Read number of routes from connected child
-    for (int i = 0 ; i < size ; i++){           
-        read(pipes[2*idx], &childMinPath[i], sizeof(childMinPath[0]));        // Read minpath from connected child
+    read(pipes[0], &childMin, sizeof(min));                               // Read min distance from connected child
+    read(pipes[0], &childCheckedRoute, sizeof(childCheckedRoute));        // Read number of routes from connected child
+    for (int i = 0 ; i <= size ; i++){           
+        read(pipes[0], &childMinPath[i], sizeof(childMinPath[0]));        // Read minpath from connected child
     }
     
     checkedRoute += childCheckedRoute;                                        // Update total number of checked routes.
@@ -44,18 +44,18 @@ void parent_proc (int idx){
         memcpy(minpath, childMinPath, sizeof(childMinPath[0]) * size);        // Update the min path in main process
     }
     
-    close(pipes[2*idx]);                                                        // Close read pipe
+    close(pipes[0]);                                                        // Close read pipe
 }
 
 /* write min, # of checked route, path of the min distance to pipe */
-void child_proc(int idx){
-    close(pipes[2*idx]);                                           // close reading pipe
+void child_proc(){
+    close(pipes[0]);                                           // close reading pipe
 
-    write(pipes[2*idx+1], &min, sizeof(min));
-    write(pipes[2*idx+1], &checkedRoute, sizeof(checkedRoute));
-    write(pipes[2*idx+1], minpath, sizeof(minpath));
+    write(pipes[1], &min, sizeof(min));
+    write(pipes[1], &checkedRoute, sizeof(checkedRoute));
+    write(pipes[1], minpath, sizeof(minpath));
     
-    close(pipes[2*idx+1]);                                         // close writing pipe 
+    close(pipes[1]);                                         // close writing pipe 
     
 }
 
@@ -96,7 +96,7 @@ void sigintHandler (int sig){
         printf("Wait for all children to be terminated\n");
         for (int i = 0 ; i < childTotal ; i++){
             wait(NULL);                                      // Wait for all children are teminated
-            parent_proc(i);                                  // Read data from pipes with each children's file director
+            parent_proc();                                  // Read data from pipes with each children's file director
         }
         printResult();                                       // Print the result
         exit(0);                                             // Terminate main process
@@ -108,27 +108,21 @@ void _travel (int idx, int taskID){
     if (idx == size){     
         length += cities[path[size-1]][path[0]];             // Add the last city length 	
         checkedRoute++;                                      // Number of routes that the child process traversed  
-        
-        printf("Path: (");
-	    for (int i = 0 ; i < size-1 ; i++) {
-		    printf("%d ", path[i]);
-        }
-	    printf("%d) by %d\n", path[0], getpid()); 
+        path[idx+1] = path[0];
         
         if (min > length){                                   // Check if the length of current permuation is the best    
             min = length;                                    // Set the best value
-            memcpy(minpath, path, sizeof(path[0]) * size );  // Save the best path
+            memcpy(minpath, path, sizeof(path[0]) * (size+1) );  // Save the best path
         } 
 
         length -= cities[path[size-1]][path[0]];             // Remove the current city and return to try other permutation
         if (killFlag == 1) {                                 // SINGINT signal is invoked. Child processes needs to be terminated after trying last combination
-            child_proc(taskID);                              // Write data of current state into pipe
+            child_proc();                              // Write data of current state into pipe
             exit(0);                                         // Terminate child process
         }
     }
     else {
         for (int i = 0 ; i < size ; i++){
-            /* Child process behavior */
             if (visited[i] == 0){                            // Check if the route is already visited
                 path[idx] = i;                               // Record the order of visiting
                 visited[i] = 1;                              // Mark as visited
@@ -151,7 +145,7 @@ void subtaskMaker (int idx, int childNumLimit){
         else if (pid == 0){
             checkedRoute=0;
             _travel(idx, childTotal);
-            child_proc(childTotal);
+            child_proc();
             exit(0);
         }
         else{
@@ -195,22 +189,20 @@ int main (int argc, char* argv []){
     fclose(fp);
 
     /* Allocate and initialize pipes */
-    pipes = (int*)malloc(sizeof(int) * size*2);
-    for (int i = 0 ; i <size ; i++){
-        pipe(&pipes[2*i]);
-    }
+    pipe(pipes);
 
     for (int i = 0 ; i < size ; i++){
         visited[i] = 1;
         path[0] = i;
+        length = 0;
         subtaskMaker(1, childNumLimit);
         visited[i] = 0;
     }
     
     /* All tasks are distributed to children */
     for (int i = 0 ; i < childTotal ; i++){
-        wait(NULL);                         // Wait for all children are teminated
-        parent_proc(i);                     // Read data from pipes 
+        wait(NULL);                                           // Wait for all children are teminated
+        parent_proc();                                       // Read data from pipes 
     }
 
     /* Printout the result */
