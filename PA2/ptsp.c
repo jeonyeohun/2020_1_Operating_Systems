@@ -7,24 +7,20 @@
 #include <limits.h>
 
 int cities[51][51];                 // Map of city distance
-int used [51];                      // Mark visited city
+int visited [51];                      // Mark visited city
 int path [51] = {0,};               // Record route
 int minpath [51] = {0,};            // The best path for the shortest distance
 int size;                           // The total number of cities
-                     // Task prefix. This prefix will be the identifier of single process
 
 int length;                         // Current weight of distance
 int min = INT_MAX;                  // Store minimum distance of traversed route
 
-long long checkedRoute=0;                 // Number of checked route by single process
+long long checkedRoute=0;           // Number of checked route by single process
 
-pid_t pid = 1;                      // Get pid after calling fork()
-
-int childLimit;                     // The Maximum number of child process 
-int childNum = 0;                   // Tracking the number of child process currently running
+pid_t pid = 1;                      // Get pid by calling fork()
 int * pipes;                        // Number of pipes each process will have a pair of pipes one for read, one for write
 
-int killFlag = 0;                       // flag variable to distinguish user sent SIGINT
+int killFlag = 0;                   // flag variable to distinguish user sent SIGINT
 
 void parent_proc (int idx){
     close(pipes[2*idx+1]);                                                    // Close write pipe
@@ -94,6 +90,7 @@ void sigintHandler (int sig){
         killFlag = 1;                               // Change kill flag to true
         return;                                     // Get back to work
     }
+    /* Main process behavior for signal */
     else{
         for (int i = 1 ; i < size ; i++){
             wait(NULL);                         // Wait for all children are teminated
@@ -114,8 +111,9 @@ void _travel (int idx, int taskPrefix){
             min = length;                                    // Set the best value
             memcpy(minpath, path, sizeof(path[0]) * size );  // Save the best path
         } 
+
         length -= cities[path[size-1]][path[0]];             // Remove the current city and return to try other permutation
-        if (killFlag == 1) {                                     // SINGINT signal is passed. Child processes needs to be terminated after trying last combination
+        if (killFlag == 1) {                                 // SINGINT signal is invoked. Child processes needs to be terminated after trying last combination
             child_proc(taskPrefix);                          // Write data of current state into pipe
             exit(0);                                         // Terminate child process
         }
@@ -123,22 +121,25 @@ void _travel (int idx, int taskPrefix){
     else {
         for (int i = 0 ; i < size ; i++){
             /* Child process behavior */
-            if (used[i] == 0){                       // Check if the route is already visited
+            if (visited[i] == 0){                       // Check if the route is already visited
                 path[idx] = i;                       // Record the order of visiting
-                used[i] = 1;                         // Mark as visited
+                visited[i] = 1;                         // Mark as visited
                 length += cities[path[idx-1]][i];    // Add length
-                _travel(idx+1, taskPrefix);                      // Move to the next city
+                _travel(idx+1, taskPrefix);          // Move to the next city
                 length -= cities[path[idx-1]][i];    // Restore length to before visiting the city
-                used[i] = 0;                         // Reset the marking
+                visited[i] = 0;                         // Reset the marking
             }       
         }
     }
 }
 
 int main (int argc, char* argv []){
+    int childNumLimit;                                     // The Maximum number of child process 
+    int childNum = 0;                                   // Tracking the number of child process currently running
+
     FILE * fp = fopen (argv[1], "r");
-    childLimit = atoi(argv[2]);
-    signal(SIGINT, sigintHandler);                      // set signal handler for SIGINT with defined function
+    childNumLimit = atoi(argv[2]);                         // Limit number of child process
+    signal(SIGINT, sigintHandler);                      // Set signal handler for SIGINT with defined function
 
     /* Get number of cities */
     size = getNcities(argv[1]);
@@ -151,6 +152,7 @@ int main (int argc, char* argv []){
     }
 
     fclose(fp);
+
     /* Allocate and initialize pipes */
     pipes = (int*)malloc(sizeof(int) * size*2);
     for (int i = 0 ; i <size ; i++){
@@ -159,32 +161,37 @@ int main (int argc, char* argv []){
 
     /* Start traverse routes from 0 */
     for (int i = 1 ; i < size ; i++){
-        used[0] = 1;
-        pid = fork();
-        if (pid == -1){
+        visited[0] = 1;                                      // Mark start node as visited 
+        pid = fork();                                     // Create child process
+        /* Forking failed */
+        if (pid == -1){ 
             printf("fork failed\n");
             exit(-1);
         }
+        /* Child process behavior */
         else if (pid == 0){
-            used[i] = 1;
+            visited[i] = 1;
             path[1] = i;
             length = cities[path[0]][i]; 
             _travel(2, i);
-            child_proc(i);                         // if child finishes his task, write data into given pipe and terminates
+            child_proc(i);                                // If child finishes his task, write data into given pipe and terminates
             exit(0);
         }
+        /* Main process behavior. Child never gets to this point */
         childNum++; 
-        if (childNum == childLimit){                      // Check if the current process is up to the limit
+        if (childNum == childNumLimit){                      // Check if the current process is up to the limit
             wait(NULL);                                   // Wait for any child finishes his work
             childNum--;                                   // Update the number of child right after any child terminates
         }       
     }
     
+    /* All tasks are distributed to children */
     for (int i = 1 ; i < size ; i++){
         wait(NULL);                         // Wait for all children are teminated
         parent_proc(i);                     // Read data from pipes 
     }
 
+    /* Printout the result */
     printResult();
 
     return 0;
