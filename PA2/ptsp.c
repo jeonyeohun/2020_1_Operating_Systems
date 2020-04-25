@@ -25,7 +25,7 @@ pid_t pid = 1;                      // Get pid by calling fork()
 int pipes[2];                        // Number of pipes each process will have a pair of pipes one for read, one for write
 
 void parent_proc (){
-    close(pipes[1]);                                                    // Close write pipe
+    //close(pipes[1]);                                                    // Close write pipe
     
     int childMin;  
     long long childCheckedRoute;
@@ -33,9 +33,11 @@ void parent_proc (){
     
     read(pipes[0], &childMin, sizeof(childMin));                               // Read min distance from connected child
     read(pipes[0], &childCheckedRoute, sizeof(childCheckedRoute));        // Read number of routes from connected child
-    read(pipes[0], &childMinPath, sizeof(childMinPath[0])*size);        // Read minpath from connected child
+    read(pipes[0], &childMinPath, sizeof(childMinPath));        // Read minpath from connected child
     
     checkedRoute += childCheckedRoute;                                        // Update total number of checked routes.
+
+    printf("%d, %lld\n", childMin, childCheckedRoute);
 
      printf("Read Path: (");
         for (int i = 0 ; i <= size ; i++) {
@@ -50,7 +52,7 @@ void parent_proc (){
     printf("Check : %d\n", sum);
     if (childMin > -1 && min > childMin){                                                      
         min = childMin;                                                       // Update the min distance in main process
-        memcpy(minpath, childMinPath, sizeof(childMinPath[0])*size);          // Update the min path in main process
+        memcpy(minpath, childMinPath, sizeof(childMinPath));          // Update the min path in main process
     }    
 }
 
@@ -58,9 +60,10 @@ void parent_proc (){
 void child_proc(){
     close(pipes[0]);                                           // close reading pipe
 
+    printf("=======  %d  ========\n", pipes[1]);
     write(pipes[1], &min, sizeof(min));
     write(pipes[1], &checkedRoute, sizeof(checkedRoute));
-    write(pipes[1], minpath, sizeof(minpath[0])*size);
+    write(pipes[1], minpath, sizeof(minpath));
 
     printf("Write Path: (");
 	for (int i = 0 ; i <= size ; i++) {
@@ -106,8 +109,14 @@ void sigintHandler (int sig){
 }
 
 void sigchldHandler (int sig){
-    childNum--;   
+    pid_t p;
+    int status;
+
+    p = wait(&status);
     parent_proc();
+    printf("child %d done\n", p);
+    childNum--;   
+    
 }
 
 /* Recursively traverse all the possible routes and calculate the length */
@@ -140,24 +149,29 @@ void _travel (int idx){
 
 void subtaskMaker (int idx, int childNumLimit){     
     if (idx == size-MAX_SUBTASK){ 
-        if (childNum == childNumLimit){                       // Check if the current process is up to the limit
-                wait(NULL);                                   // Wait for any child finishes his work
-        }    
-        if((pid = fork()) > 0){ 
-            childNum++;
-        }
+        pid = fork();
         
         if (pid < 0){
             printf("Fork failed.\n");
             exit(0);
         }
+
+        if (pid > 0){
+            childNum++;
+            if (childNum == childNumLimit){
+                printf("============ Start Wainting ==============\n");
+                wait(NULL);
+                printf("============ Resume ==============\n");
+            }
+        }
+
         if (pid == 0){
             checkedRoute=0;
             min = -1;
             _travel(idx);
             child_proc();
             exit(0);
-        }      
+        }     
     }
     else {
         for (int i = 0 ; i < size ; i++){
@@ -204,5 +218,7 @@ int main (int argc, char* argv []){
     /* Printout the result */
     printResult();
 
+    close(pipes[0]);
+    close(pipes[1]);
     return 0;
 }
