@@ -35,12 +35,6 @@ void parent_proc (){
     
     checkedRoute += childCheckedRoute;                                         // Update total number of checked routes.
 
-    printf("Read Path: (");
-        for (int i = 0 ; i <= size ; i++) {
-            printf("%d ", childminPath[i]);
-        }
-        printf(") min: %d\n", childMin); 
-
     if (min == -1 || min > childMin){                                                      
         min = childMin;                                                        // Update the min distance in main process
         memcpy(minPath, childminPath, sizeof(childminPath));                   // Update the min path in main process
