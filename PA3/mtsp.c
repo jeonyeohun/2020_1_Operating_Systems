@@ -17,7 +17,6 @@ int minPath[51] = {
 int size;     // The total number of cities
 int min = -1; // Store minimum distance of traversed route
 int threadLimit;
-int tidx;
 
 long long checkedRoute = 0; // Number of checked route by single process
 
@@ -190,8 +189,8 @@ void *producer_func(void *ptr)
 
 void *consumer_func(void *ptr)
 {
-    int td = tidx;
-    threadList[td].tid = pthread_self();
+    int idx = *(int *)ptr;
+    threadList[idx].tid = pthread_self();
     while (1)
     {
         int *prefix;
@@ -210,7 +209,7 @@ void *consumer_func(void *ptr)
             path[i] = prefix[i];
         }
 
-        _travel(size - MAX_SUBTASK, visited, path, length, td);
+        _travel(size - MAX_SUBTASK, visited, path, length, idx);
     }
     return 0x0;
 }
@@ -244,8 +243,7 @@ int main(int argc, char *argv[])
     pthread_create(&producer, 0x0, producer_func, 0x0);
     for (int i = 0; i < threadLimit; i++)
     {
-        tidx = i;
-        pthread_create(&(consumer[i]), 0x0, consumer_func, 0x0);
+        pthread_create(&(consumer[i]), 0x0, consumer_func, i);
         threadList[i].checked_route = 0;
     }
 
@@ -263,7 +261,7 @@ int main(int argc, char *argv[])
         {
             for (int i = 0; i < threadLimit; i++)
             {
-                printf("tid : %ul \n # checked route : %lld\n", threadList[i].tid, threadList[i].checked_route);
+                printf("tid : %lu \n # checked route : %lld\n", threadList[i].tid, threadList[i].checked_route);
             }
         }
     }
