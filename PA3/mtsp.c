@@ -10,15 +10,19 @@
 
 #define MAX_SUBTASK 11            
 
-int cities[51][51];                 // Map of city distance               // Record route
+int cities[51][51];                 // Map of city distance               
 int minPath [51] = {0,};            // The best path for the shortest distance
 int size;                           // The total number of cities
-int length;                         // Current weight of distance
 int min = -1;                       // Store minimum distance of traversed route
 int threadLimit;
 
 long long checkedRoute=0;           // Number of checked route by single process
 
+typedef struct{
+	pthread_t tid;
+	long long checked_route;
+}thread_info;
+thread_info threadList[8];
 typedef struct {
 	sem_t filled ;
 	sem_t empty ;
@@ -52,7 +56,7 @@ void bounded_buffer_queue(bounded_buffer * buf, int * msg, int idx)
 
         pthread_t tid;
         tid = pthread_self();
-        printf("%d puts : ", (int)tid);
+        printf("%lld puts : ", (long long)tid);
         for(int i = 0 ; i < idx ; i++){
             printf("%d ", (buf->elem[buf->rear])[i]);
         }
@@ -70,9 +74,20 @@ int * bounded_buffer_dequeue(bounded_buffer * buf)
 	sem_wait(&(buf->filled)) ;
 	pthread_mutex_lock(&(buf->lock)) ;
 		
+	r = buf->elem[buf->front];
         buf->front = (buf->front + 1) % buf->capacity ;
 		buf->num -= 1 ;
+        
+	pthread_t tid;
+        tid = pthread_self();
+ 	
+	printf("%lld gets : ", (long long)tid);
 
+        for(int i = 0 ; i < size-MAX_SUBTASK ; i++){
+            printf("%d ", r[i]);
+        }
+        printf("\n");
+ 
 	pthread_mutex_unlock(&(buf->lock)) ;
 	sem_post(&(buf->empty)) ;
 	return r ;
@@ -105,23 +120,27 @@ void printResult(){
 
 /* Behavior when SIGINT invoked */
 void sigintHandler (){                
-    
+	printResult();
+	exit(0);    
 }
 
-/* Behavior when SIGCHLD invoked */
-void sigchldHandler (){                                    // Let main process reads pipe and set the optimal solution 
-
-}
 
 /* Recursively traverse all the possible routes and calculate the length */
-void _travel (int idx, int * visited, int * path){     
+void _travel (int idx, int * visited, int * path, int length){     
     if (idx == size){
         path[idx] = path[0];                                    // Set route from last city to starting city.
 
         length += cities[path[idx-1]][path[idx]];               // Add the last city length 	
         checkedRoute++;                                         // Number of routes that the child process traversed  
         
-        if (min == -1 || min > length){                         // Check if the length of current permuation is the best    
+	for (int i = 0 ; i < threadLimit ; i++){
+		if (threadList[i].tid == pthread_self()){
+			threadList[i].checked_route++;
+		}
+
+
+}	
+        if (min == -1 ||  min > length){                        // Check if the length of current permuation is the best    
             min = length;                                       // Set the best value
             memcpy(minPath, path, sizeof(minPath));             // Save the best path
         } 
@@ -133,7 +152,7 @@ void _travel (int idx, int * visited, int * path){
                 path[idx] = i;                                  // Record the order of visiting
                 visited[i] = 1;                                 // Mark as visited
                 length += cities[path[idx-1]][i];               // Add length
-                _travel(idx + 1, visited, path);                               // Move to the next city
+                _travel(idx + 1, visited, path, length);                               // Move to the next city
                 length -= cities[path[idx-1]][i];               // Restore length to before visiting the city
                 visited[i] = 0;                                 // Reset the marking
             }       
@@ -145,7 +164,6 @@ void _travel (int idx, int * visited, int * path){
 void subtaskMaker (int idx, int size, int * visited, int * path){     
     /* When prefix of the substask is created. */ 
     if (idx == size-MAX_SUBTASK){ 
-       while(buf->num == threadLimit);
         printf("%d\n", buf->num);
         bounded_buffer_queue(buf, path, idx) ;
     }
@@ -168,23 +186,28 @@ void * producer_func (void * ptr){
     return 0x0;
 }
 
-void * consumer_func (void * ptr){
+void * consumer_func (int idx){
+	threadList[idx].tid = pthread_self();
+	while(1){
     int * prefix; 
     int path [51] = {0,};
     int visited [51] = {0,};            // Mark visited city
+	int length = 0;
     prefix = bounded_buffer_dequeue(buf);
 
-    for (int i = 0 ; i < 5 ; i++){
+    for (int i = 0 ; i < size-MAX_SUBTASK ; i++){
         visited[prefix[i]] = 1;
         path[i] = prefix[i];
     }
 
-    _travel(size-MAX_SUBTASK+1, visited, path);
-
+    _travel(size-MAX_SUBTASK, visited, path, length);
+}
     return 0x0;
 }
 
 int main (int argc, char* argv []){
+
+	signal(SIGINT, sigintHandler);
     FILE * fp = fopen (argv[1], "r");
     threadLimit = atoi(argv[2]);                        // Limit number of child process
     
@@ -204,15 +227,33 @@ int main (int argc, char* argv []){
         }
     }
     fclose(fp);
-
+	
     pthread_create(&producer, 0x0, producer_func, 0x0);
     for(int i = 0 ; i < threadLimit ; i++){
-        pthread_create(&(consumer[i]), 0x0, consumer_func, 0x0) ;
+        pthread_create(&(consumer[i]), 0x0, consumer_func, i) ;
+	threadList[i].checked_route = 0;
     }
-
+	
+	while(1){
+	char op [10];
+	printf("input option(statm, threads, num N): ");
+	scanf("%s", op);
+	
+	if (op[0] == 's'){
+		printResult();
+	} 
+	else if (op[0] == 't'){
+		for (int i = 0 ; i < threadLimit ; i++){
+			printf("tid : %d \n # checked route : %lld\n", threadList[i].tid, threadList[i].checked_route);
+}
+	}
+		
+}
     pthread_join(producer, 0x0) ;
     for (int i = 0 ; i < threadLimit ; i++) {
-		pthread_join(consumer[i], 0x0) ;
+		int status;		
+		status = pthread_join(consumer[i], 0x0) ;
+		printf("%d\n", status);
 	}
 
     return 0;
