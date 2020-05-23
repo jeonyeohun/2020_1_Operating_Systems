@@ -102,7 +102,7 @@ int getNcities(char *arg)
 void printResult()
 {
     long long total = 0;
-    for (int i = 0; i < threadLimit; i++)
+    for (int i = 0; i < sizeof(checkedRoute) / sizeof(checkedRoute[0]); i++)
     {
         total += checkedRoute[i];
     }
@@ -303,7 +303,6 @@ int main(int argc, char *argv[])
                     *arg = i;
                     pthread_create(&(consumer[i]), 0x0, consumer_func, arg);
                 }
-                threadLimit = newN;
             }
             else if (threadLimit > newN)
             {
@@ -314,6 +313,7 @@ int main(int argc, char *argv[])
                     pthread_join(consumer[i], 0x0);
                 }
             }
+            threadLimit = newN;
         }
     }
 
