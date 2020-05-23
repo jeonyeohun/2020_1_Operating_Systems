@@ -201,27 +201,27 @@ void *producer_func(void *ptr)
 
 void cleanup_handler(void *arg)
 {
+	printf("handler on\n");
     int *prefix = (int *)arg;
     printf("save: ");
-    for (int i = 0; i < size - MAX_SUBTASK; i++)
-    {
-        printf("%d ", prefix[i]);
-    }
-    printf("\n");
+	for (int i = 0 ; i< size-MAX_SUBTASK ; i++){
+   
+ printf("%d ", prefix[i]);
+}    printf("\n");
 }
 
 void *consumer_func(void *ptr)
 {
-    int *prefix;
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
     runningThread++;
     int idx = *(int *)ptr;
     pthread_mutex_t lock;
     pthread_mutex_init(&lock, 0x0);
-    pthread_cleanup_push(cleanup_handler, prefix);
-
-    while (1)
+        while (1)
     {
 
+    int *prefix;
         int path[51] = {0};
         int visited[51] = {0};
         int length = 0;
@@ -234,6 +234,8 @@ void *consumer_func(void *ptr)
         }
         pthread_mutex_unlock(&lock);
         prefix = bounded_buffer_dequeue(buf);
+pthread_cleanup_push(cleanup_handler, prefix);
+
 
         for (int i = 0; i < size - MAX_SUBTASK; i++)
         {
@@ -241,9 +243,9 @@ void *consumer_func(void *ptr)
             path[i] = prefix[i];
         }
 
-        _travel(size - MAX_SUBTASK, visited, path, length, idx);
+       _travel(size - MAX_SUBTASK, visited, path, length, idx);
+     pthread_cleanup_pop(0);
     }
-    pthread_cleanup_pop(0);
     runningThread--;
     return 0x0;
 }
@@ -313,7 +315,9 @@ int main(int argc, char *argv[])
             {
                 for (int i = threadLimit - 1; i >= newN; i--)
                 {
+			printf("cancel\n");
                     pthread_cancel(consumer[i]);
+			pthread_join(consumer[i], 0x0);
                 }
             }
         }
