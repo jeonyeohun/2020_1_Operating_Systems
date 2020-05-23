@@ -17,6 +17,7 @@ int minPath[MAX_CITIES + 1] = {0};          // The best path for the shortest di
 int size;                                   // The total number of cities
 int min = -1;                               // Store minimum distance of traversed route
 int threadLimit;
+int runningThread = 0;
 
 pthread_t producer;
 pthread_t consumer[MAX_THREADS];
@@ -190,6 +191,7 @@ void *producer_func(void *ptr)
 
 void *consumer_func(void *ptr)
 {
+    runningThread++;
     int idx = *(int *)ptr;
     pthread_mutex_t lock;
     pthread_mutex_init(&lock, 0x0);
@@ -200,13 +202,13 @@ void *consumer_func(void *ptr)
         int visited[51] = {0};
         int length = 0;
 
-        pthread_mutex_lock(&(buf->lock));
+        pthread_mutex_lock(&lock);
         if (!isProducerAlive && buf->num == 0)
         {
             pthread_mutex_unlock(&(buf->lock));
             break;
         }
-        pthread_mutex_unlock(&(buf->lock));
+        pthread_mutex_unlock(&lock);
         prefix = bounded_buffer_dequeue(buf);
 
         for (int i = 0; i < size - MAX_SUBTASK; i++)
@@ -217,6 +219,7 @@ void *consumer_func(void *ptr)
 
         _travel(size - MAX_SUBTASK, visited, path, length, idx);
     }
+    runningThread--;
     return 0x0;
 }
 
@@ -250,7 +253,7 @@ int main(int argc, char *argv[])
         pthread_create(&(consumer[i]), 0x0, consumer_func, arg);
     }
 
-    while (1)
+    while (isProducerAlive && runningThread > 0)
     {
         char op[10];
         printf("input option(stat, threads, num N): ");
@@ -276,5 +279,6 @@ int main(int argc, char *argv[])
         status = pthread_join(consumer[i], 0x0);
     }
 
+    printResult();
     return 0;
 }
