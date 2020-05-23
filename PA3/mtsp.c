@@ -25,7 +25,57 @@ pthread_t consumer[MAX_THREADS];
 long long checkedRoute[MAX_THREADS] = {0}; // Number of checked route by single process
 int isProducerAlive = 0;
 
-int *stop_data_queue[51];
+typedef struct
+{
+    pthread_mutex_t lock;
+    int **elem;
+    int capacity;
+    int num;
+    int front;
+    int rear;
+} stopped_prefix;
+
+stopped_prefix *queue = 0x0;
+
+void stopped_prefix_init(stopped_prefix *queue)
+{
+    pthread_mutex_init(&(buf->lock), 0x0);
+    buf->capacity = 100;
+    buf->elem = (int **)calloc(sizeof(int *), 100);
+    buf->num = 0;
+    buf->front = 0;
+    buf->rear = 0;
+}
+
+void stopped_prefix_queue(stopped_prefix *queue, int *prefix)
+{
+    pthread_mutex_lock(&(queue->lock));
+
+    (queue->elem)[queue->rear] = (int *)malloc(sizeof(prefix[0]) * size - MAX_SUBTASK);
+    memcpy((queue->elem)[queue->rear], prefix, sizeof(prefix[0]) * size - MAX_SUBTASK);
+    queue->rear = (queue->rear + 1) % queue->capacity;
+    queue->num += 1;
+
+    pthread_mutex_unlock(&(queue->lock));
+
+    for (int i = 0; i < sizeof(prefix) / sizeof(prefix[0]); i++)
+    {
+        printf("%d ", prefix[i]);
+    }
+}
+
+int *stopped_prefix_dequeue(stopped_prefix *queue)
+{
+    int *r = 0x0;
+    pthread_mutex_lock(&(queue->lock));
+
+    r = queue->elem[queue->front];
+    queue->front = (queue->front + 1) % queue->capacity;
+    queue->num -= 1;
+
+    pthread_mutex_unlock(&(queue->lock));
+    return r;
+}
 
 typedef struct
 {
@@ -196,12 +246,8 @@ void cleanup_handler(void *arg)
     printf("handler on\n");
     int prefix[size - MAX_SUBTASK];
     memcpy(prefix, arg, sizeof(prefix));
-    printf("save: ");
-    for (int i = 0; i < sizeof(prefix) / sizeof(prefix[0]); i++)
-    {
-        printf("%d ", prefix[i]);
-    }
-    printf("\n");
+
+    stopped_prefix_queue(queue, prefix);
 }
 
 void *consumer_func(void *ptr)
@@ -226,8 +272,7 @@ void *consumer_func(void *ptr)
             break;
         }
 
-        if ()
-            pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&lock);
         prefix = bounded_buffer_dequeue(buf);
         pthread_cleanup_push(cleanup_handler, prefix);
 
