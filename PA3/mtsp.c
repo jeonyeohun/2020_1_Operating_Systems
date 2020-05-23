@@ -243,14 +243,16 @@ int main(int argc, char *argv[])
     pthread_create(&producer, 0x0, producer_func, 0x0);
     for (int i = 0; i < threadLimit; i++)
     {
-        pthread_create(&(consumer[i]), 0x0, consumer_func, i);
+        int *arg = malloc(sizeof(*arg));
+        *arg = i;
+        pthread_create(&(consumer[i]), 0x0, consumer_func, arg);
         threadList[i].checked_route = 0;
     }
 
     while (1)
     {
         char op[10];
-        printf("input option(statm, threads, num N): ");
+        printf("input option(stat, threads, num N): ");
         scanf("%s", op);
 
         if (op[0] == 's')
