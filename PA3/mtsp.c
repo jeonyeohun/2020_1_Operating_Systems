@@ -9,24 +9,19 @@
 #include <semaphore.h>
 
 #define MAX_SUBTASK 11
+#define MAX_THREADS 8
+#define MAX_CITIES
 
-int cities[51][51]; // Map of city distance
-int minPath[51] = {
-    0,
-};            // The best path for the shortest distance
-int size;     // The total number of cities
-int min = -1; // Store minimum distance of traversed route
+int cities[MAX_CITIES + 1][MAX_CITIES + 1]; // Map of city distance
+int minPath[MAX_CITIES + 1] = {0};          // The best path for the shortest distance
+int size;                                   // The total number of cities
+int min = -1;                               // Store minimum distance of traversed route
 int threadLimit;
 
-long long checkedRoute = 0; // Number of checked route by single process
+long long checkedRoute[MAX_THREADS] = {0}; // Number of checked route by single process
 
-typedef struct
-{
-    pthread_t tid;
-    long long checked_route;
-} thread_info;
-
-thread_info threadList[8];
+pthread_t producer;
+pthread_t consumer[MAX_THREADS];
 
 typedef struct
 {
@@ -100,6 +95,12 @@ int getNcities(char *arg)
 /* Print min distance, path and number of checked route */
 void printResult()
 {
+    long long total = 0;
+    for (int i = 0; i < threadLimit; i++)
+    {
+        total += checkedRoute[i]
+    }
+
     printf("\nThe shortest distance: %d\n", min);
     printf("Path: (");
     for (int i = 0; i < size; i++)
@@ -107,7 +108,7 @@ void printResult()
         printf("%d ", minPath[i]);
     }
     printf("%d)\n", minPath[0]);
-    printf("The number of checked route is %lld.\n", checkedRoute);
+    printf("The number of checked route is %lld.\n", total);
 }
 
 /* Behavior when SIGINT invoked */
@@ -125,8 +126,7 @@ void _travel(int idx, int *visited, int *path, int length, int tidx)
         path[idx] = path[0]; // Set route from last city to starting city.
 
         length += cities[path[idx - 1]][path[idx]]; // Add the last city length
-        checkedRoute++;                             // Number of routes that the child process traversed
-        threadList[tidx].checked_route++;
+        checkedRoute[tidx]++;                       // Number of routes that the child process traversed
 
         if (min == -1 || min > length)
         {                                           // Check if the length of current permuation is the best
@@ -190,7 +190,6 @@ void *producer_func(void *ptr)
 void *consumer_func(void *ptr)
 {
     int idx = *(int *)ptr;
-    threadList[idx].tid = pthread_self();
     while (1)
     {
         int *prefix;
@@ -216,13 +215,9 @@ void *consumer_func(void *ptr)
 
 int main(int argc, char *argv[])
 {
-
     signal(SIGINT, sigintHandler);
     FILE *fp = fopen(argv[1], "r");
     threadLimit = atoi(argv[2]); // Limit number of child process
-
-    pthread_t producer;
-    pthread_t consumer[threadLimit];
 
     buf = malloc(sizeof(bounded_buffer));
     bounded_buffer_init(buf, threadLimit);
@@ -246,7 +241,6 @@ int main(int argc, char *argv[])
         int *arg = malloc(sizeof(*arg));
         *arg = i;
         pthread_create(&(consumer[i]), 0x0, consumer_func, arg);
-        threadList[i].checked_route = 0;
     }
 
     while (1)
@@ -263,7 +257,7 @@ int main(int argc, char *argv[])
         {
             for (int i = 0; i < threadLimit; i++)
             {
-                printf("tid : %lu \n # checked route : %lld\n", threadList[i].tid, threadList[i].checked_route);
+                printf("tid : %lu \n # checked route : %lld\n", consumer[i], checkedRoute[i]);
             }
         }
     }
