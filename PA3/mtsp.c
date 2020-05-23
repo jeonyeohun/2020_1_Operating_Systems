@@ -25,15 +25,7 @@ pthread_t consumer[MAX_THREADS];
 long long checkedRoute[MAX_THREADS] = {0}; // Number of checked route by single process
 int isProducerAlive = 0;
 
-typedef struct
-{
-    int idx;
-    int visited[51][51];
-    int path[51];
-    int length;
-} stop_data;
-
-stop_data stop_data_queue[51];
+int *stop_data_queue[51];
 
 typedef struct
 {
@@ -201,27 +193,28 @@ void *producer_func(void *ptr)
 
 void cleanup_handler(void *arg)
 {
-	printf("handler on\n");
-    int *prefix = (int *)arg;
+    printf("handler on\n");
+    int prefix[size - MAX_SUBTASK];
+    memcpy(prefix, arg, sizeof(prefix));
     printf("save: ");
-	for (int i = 0 ; i< size-MAX_SUBTASK ; i++){
-   
- printf("%d ", prefix[i]);
-}    printf("\n");
+    for (int i = 0; i < sizeof(prefix) / sizeof(prefix[0]); i++)
+    {
+        printf("%d ", prefix[i]);
+    }
+    printf("\n");
 }
 
 void *consumer_func(void *ptr)
 {
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
     runningThread++;
     int idx = *(int *)ptr;
     pthread_mutex_t lock;
     pthread_mutex_init(&lock, 0x0);
-        while (1)
+    while (1)
     {
-
-    int *prefix;
+        int *prefix;
         int path[51] = {0};
         int visited[51] = {0};
         int length = 0;
@@ -232,10 +225,11 @@ void *consumer_func(void *ptr)
             pthread_mutex_unlock(&(buf->lock));
             break;
         }
-        pthread_mutex_unlock(&lock);
-        prefix = bounded_buffer_dequeue(buf);
-pthread_cleanup_push(cleanup_handler, prefix);
 
+        if ()
+            pthread_mutex_unlock(&lock);
+        prefix = bounded_buffer_dequeue(buf);
+        pthread_cleanup_push(cleanup_handler, prefix);
 
         for (int i = 0; i < size - MAX_SUBTASK; i++)
         {
@@ -243,8 +237,8 @@ pthread_cleanup_push(cleanup_handler, prefix);
             path[i] = prefix[i];
         }
 
-       _travel(size - MAX_SUBTASK, visited, path, length, idx);
-     pthread_cleanup_pop(0);
+        _travel(size - MAX_SUBTASK, visited, path, length, idx);
+        pthread_cleanup_pop(0);
     }
     runningThread--;
     return 0x0;
@@ -315,9 +309,9 @@ int main(int argc, char *argv[])
             {
                 for (int i = threadLimit - 1; i >= newN; i--)
                 {
-			printf("cancel\n");
+                    printf("cancel\n");
                     pthread_cancel(consumer[i]);
-			pthread_join(consumer[i], 0x0);
+                    pthread_join(consumer[i], 0x0);
                 }
             }
         }
