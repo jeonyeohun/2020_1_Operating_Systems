@@ -27,6 +27,16 @@ int isProducerAlive = 0;
 
 typedef struct
 {
+    int idx;
+    int visited[51][51];
+    int path[51];
+    int length;
+} stop_data;
+
+stop_data stop_data_queue[51];
+
+typedef struct
+{
     sem_t filled;
     sem_t empty;
     pthread_mutex_t lock;
@@ -230,7 +240,7 @@ int main(int argc, char *argv[])
     threadLimit = atoi(argv[2]); // Limit number of child process
 
     buf = malloc(sizeof(bounded_buffer));
-    bounded_buffer_init(buf, threadLimit);
+    bounded_buffer_init(buf, 8);
 
     /* Get number of cities */
     size = getNcities(argv[1]);
@@ -268,6 +278,24 @@ int main(int argc, char *argv[])
             for (int i = 0; i < threadLimit; i++)
             {
                 printf("tid : %lu \n # checked route : %lld\n", consumer[i], checkedRoute[i]);
+            }
+        }
+        else if (op[0] == 'n')
+        {
+            int newN;
+            scanf("%d", &newN);
+            if (threadLimit < newN)
+            {
+                for (int i = threadLimit; i < newN; i++)
+                {
+                    int *arg = malloc(sizeof(*arg));
+                    *arg = i;
+                    pthread_create(&(consumer[i]), 0x0, consumer_func, arg);
+                }
+                threadLimit = newN;
+            }
+            else if (threadLimit > newN)
+            {
             }
         }
     }
