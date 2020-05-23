@@ -10,7 +10,8 @@
 
 #define MAX_SUBTASK 11
 #define MAX_THREADS 8
-#define MAX_CITIES
+#define MAX_CITIES 50
+
 
 int cities[MAX_CITIES + 1][MAX_CITIES + 1]; // Map of city distance
 int minPath[MAX_CITIES + 1] = {0};          // The best path for the shortest distance
@@ -18,10 +19,10 @@ int size;                                   // The total number of cities
 int min = -1;                               // Store minimum distance of traversed route
 int threadLimit;
 
-long long checkedRoute[MAX_THREADS] = {0}; // Number of checked route by single process
-
 pthread_t producer;
 pthread_t consumer[MAX_THREADS];
+
+long long checkedRoute[MAX_THREADS] = {0}; // Number of checked route by single process
 
 typedef struct
 {
@@ -98,7 +99,7 @@ void printResult()
     long long total = 0;
     for (int i = 0; i < threadLimit; i++)
     {
-        total += checkedRoute[i]
+        total += checkedRoute[i];
     }
 
     printf("\nThe shortest distance: %d\n", min);
@@ -190,6 +191,7 @@ void *producer_func(void *ptr)
 void *consumer_func(void *ptr)
 {
     int idx = *(int *)ptr;
+printf("%d\n", idx);
     while (1)
     {
         int *prefix;
