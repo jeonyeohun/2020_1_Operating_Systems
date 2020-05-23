@@ -39,12 +39,12 @@ stopped_prefix *queue = 0x0;
 
 void stopped_prefix_init(stopped_prefix *queue)
 {
-    pthread_mutex_init(&(buf->lock), 0x0);
-    buf->capacity = 100;
-    buf->elem = (int **)calloc(sizeof(int *), 100);
-    buf->num = 0;
-    buf->front = 0;
-    buf->rear = 0;
+    pthread_mutex_init(&(queue->lock), 0x0);
+    queue->capacity = 100;
+    queue->elem = (int **)calloc(sizeof(int *), 100);
+    queue->num = 0;
+    queue->front = 0;
+    queue->rear = 0;
 }
 
 void stopped_prefix_queue(stopped_prefix *queue, int *prefix)
@@ -296,7 +296,9 @@ int main(int argc, char *argv[])
     threadLimit = atoi(argv[2]); // Limit number of child process
 
     buf = malloc(sizeof(bounded_buffer));
+    queue = malloc(sizeof(stopped_prefix));
     bounded_buffer_init(buf, 8);
+    stopped_prefix_init(queue);
 
     /* Get number of cities */
     size = getNcities(argv[1]);
