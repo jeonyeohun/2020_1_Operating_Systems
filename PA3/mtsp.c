@@ -199,15 +199,29 @@ void *producer_func(void *ptr)
     return 0x0;
 }
 
+void cleanup_handler(void *arg)
+{
+    int *prefix = (int *)arg;
+    printf("save: ");
+    for (int i = 0; i < size - MAX_SUBTASK; i++)
+    {
+        printf("%d ", prefix[i]);
+    }
+    printf("\n");
+}
+
 void *consumer_func(void *ptr)
 {
+    int *prefix;
     runningThread++;
     int idx = *(int *)ptr;
     pthread_mutex_t lock;
     pthread_mutex_init(&lock, 0x0);
+    pthread_cleanup_push(cleanup_handler, prefix);
+
     while (1)
     {
-        int *prefix;
+
         int path[51] = {0};
         int visited[51] = {0};
         int length = 0;
@@ -229,6 +243,7 @@ void *consumer_func(void *ptr)
 
         _travel(size - MAX_SUBTASK, visited, path, length, idx);
     }
+    pthread_cleanup_pop(0);
     runningThread--;
     return 0x0;
 }
@@ -277,7 +292,7 @@ int main(int argc, char *argv[])
         {
             for (int i = 0; i < threadLimit; i++)
             {
-                printf("tid : %lu \n # checked route : %lld\n", consumer[i], checkedRoute[i]);
+                printf("tid : %lu | # checked route : %lld\n", consumer[i], checkedRoute[i]);
             }
         }
         else if (op[0] == 'n')
@@ -296,6 +311,10 @@ int main(int argc, char *argv[])
             }
             else if (threadLimit > newN)
             {
+                for (int i = threadLimit - 1; i >= newN; i--)
+                {
+                    pthread_cancel(consumer[i]);
+                }
             }
         }
     }
