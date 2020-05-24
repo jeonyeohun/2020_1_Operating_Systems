@@ -57,12 +57,6 @@ void stopped_prefix_queue(stopped_prefix *queue, int *prefix)
     queue->rear = (queue->rear + 1) % queue->capacity;
     queue->num += 1;
 
-    printf("%lu stops and puts: ", pthread_self());
-    for (int i = 0; i < size - MAX_SUBTASK; i++)
-    {
-        printf("%d ", prefix[i]);
-    }
-
     pthread_mutex_unlock(&(queue->lock));
 }
 
@@ -76,13 +70,6 @@ int *stopped_prefix_dequeue(stopped_prefix *queue)
     queue->num -= 1;
 
     pthread_mutex_unlock(&(queue->lock));
-
-    printf("%lu takes: ", pthread_self());
-    for (int i = 0; i < size - MAX_SUBTASK; i++)
-    {
-        printf("%d ", r[i]);
-    }
-    printf("\n");
 
     return r;
 }
@@ -284,6 +271,7 @@ void *consumer_func(void *ptr)
             if (!isProducerAlive && buf->num == 0)
             {
                 pthread_mutex_unlock(&(buf->lock));
+                prinf("break\n");
                 break;
             }
             pthread_mutex_unlock(&lock);
