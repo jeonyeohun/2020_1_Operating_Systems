@@ -238,7 +238,6 @@ void *producer_func(void *ptr)
 
 void cleanup_handler(void *arg)
 {
-    printf("handler on\n");
     int prefix[size - MAX_SUBTASK];
     memcpy(prefix, arg, sizeof(prefix));
 
@@ -271,7 +270,6 @@ void *consumer_func(void *ptr)
             if (!isProducerAlive && buf->num == 0)
             {
                 pthread_mutex_unlock(&(buf->lock));
-                prinf("break\n");
                 break;
             }
             pthread_mutex_unlock(&lock);
@@ -358,7 +356,6 @@ int main(int argc, char *argv[])
             {
                 for (int i = threadLimit - 1; i >= newN; i--)
                 {
-                    printf("cancel\n");
                     pthread_cancel(consumer[i]);
                 }
             }
