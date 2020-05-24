@@ -29,6 +29,8 @@ int isProducerAlive = 0;
 typedef struct
 {
     pthread_mutex_t lock;
+    sem_t filled;
+    sem_t empty;
     int **elem;
     int capacity;
     int num;
@@ -41,6 +43,8 @@ stopped_prefix *queue = 0x0;
 void stopped_prefix_init(stopped_prefix *queue)
 {
     pthread_mutex_init(&(queue->lock), 0x0);
+    sem_init(&(queue->filled), 0, 0);
+    sem_init(&(queue->empty), 0, 100);
     queue->capacity = 100;
     queue->elem = (int **)calloc(sizeof(int *), 100);
     queue->num = 0;
@@ -50,6 +54,7 @@ void stopped_prefix_init(stopped_prefix *queue)
 
 void stopped_prefix_queue(stopped_prefix *queue, int *prefix)
 {
+    sem_wait(&(buf->filled));
     pthread_mutex_lock(&(queue->lock));
 
     (queue->elem)[queue->rear] = (int *)malloc(sizeof(prefix[0]) * size - MAX_SUBTASK);
@@ -58,11 +63,13 @@ void stopped_prefix_queue(stopped_prefix *queue, int *prefix)
     queue->num += 1;
 
     pthread_mutex_unlock(&(queue->lock));
+    sem_post(&(buf->filled));
 }
 
 int *stopped_prefix_dequeue(stopped_prefix *queue)
 {
     int *r = 0x0;
+    sem_wait(&(queue->empty));
     pthread_mutex_lock(&(queue->lock));
 
     r = queue->elem[queue->front];
@@ -70,7 +77,7 @@ int *stopped_prefix_dequeue(stopped_prefix *queue)
     queue->num -= 1;
 
     pthread_mutex_unlock(&(queue->lock));
-
+    sem_post(&(queue->filled));
     return r;
 }
 
@@ -240,7 +247,6 @@ void cleanup_handler(void *arg)
 {
     int prefix[size - MAX_SUBTASK];
     memcpy(prefix, arg, sizeof(prefix));
-
     stopped_prefix_queue(queue, prefix);
 }
 
