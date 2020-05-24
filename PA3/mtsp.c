@@ -57,6 +57,12 @@ void stopped_prefix_queue(stopped_prefix *queue, int *prefix)
     queue->rear = (queue->rear + 1) % queue->capacity;
     queue->num += 1;
 
+    printf("%lu stops and puts: ", pthread_self());
+    for (int i = 0; i < size - MAX_SUBTASK; i++)
+    {
+        printf("%d ", prefix[i]);
+    }
+
     pthread_mutex_unlock(&(queue->lock));
 }
 
@@ -71,11 +77,12 @@ int *stopped_prefix_dequeue(stopped_prefix *queue)
 
     pthread_mutex_unlock(&(queue->lock));
 
-printf("take: ");
-for(int i = 0 ; i < size - MAX_SUBTASK ; i++){
-printf("%d ", r[i]);
-}
-printf("\n");
+    printf("%lu takes: ", pthread_self());
+    for (int i = 0; i < size - MAX_SUBTASK; i++)
+    {
+        printf("%d ", r[i]);
+    }
+    printf("\n");
 
     return r;
 }
@@ -177,15 +184,15 @@ void _travel(int idx, int *visited, int *path, int length, int tidx)
     if (idx == size)
     {
         path[idx] = path[0]; // Set route from last city to starting city.
-    pthread_mutex_t lock;
-    pthread_mutex_init(&lock, 0x0);
+        pthread_mutex_t lock;
+        pthread_mutex_init(&lock, 0x0);
 
         length += cities[path[idx - 1]][path[idx]]; // Add the last city length
-     pthread_mutex_lock(&(buf->lock));
-       checkedRoute[tidx]++;                       // Number of routes that the child process traversed
-	totalRoute++;
-      pthread_mutex_unlock(&(buf->lock));
-      if (min == -1 || min > length)
+        pthread_mutex_lock(&(buf->lock));
+        checkedRoute[tidx]++; // Number of routes that the child process traversed
+        totalRoute++;
+        pthread_mutex_unlock(&(buf->lock));
+        if (min == -1 || min > length)
         {                                           // Check if the length of current permuation is the best
             min = length;                           // Set the best value
             memcpy(minPath, path, sizeof(minPath)); // Save the best path
@@ -259,29 +266,30 @@ void *consumer_func(void *ptr)
     int idx = *(int *)ptr;
     pthread_mutex_t lock;
     pthread_mutex_init(&lock, 0x0);
-	checkedRoute[idx] = 0;
+    checkedRoute[idx] = 0;
     while (1)
     {
         int *prefix;
         int path[51] = {0};
         int visited[51] = {0};
-        int length = 0;  
-    pthread_mutex_lock(&lock);
-	if (queue->num > 0){
-		prefix = stopped_prefix_dequeue(queue);
-		pthread_mutex_unlock(&lock);
-	}
-	else{
-		if (!isProducerAlive && buf->num == 0)
-		{
-        	    pthread_mutex_unlock(&(buf->lock));
-			break;
-        	}		
-   		pthread_mutex_unlock(&lock);
-        	prefix = bounded_buffer_dequeue(buf);
-	}	
+        int length = 0;
+        pthread_mutex_lock(&lock);
+        if (queue->num > 0)
+        {
+            prefix = stopped_prefix_dequeue(queue);
+            pthread_mutex_unlock(&lock);
+        }
+        else
+        {
+            if (!isProducerAlive && buf->num == 0)
+            {
+                pthread_mutex_unlock(&(buf->lock));
+                break;
+            }
+            pthread_mutex_unlock(&lock);
+            prefix = bounded_buffer_dequeue(buf);
+        }
         pthread_cleanup_push(cleanup_handler, prefix);
-
 
         for (int i = 0; i < size - MAX_SUBTASK; i++)
         {
@@ -328,7 +336,7 @@ int main(int argc, char *argv[])
         pthread_create(&(consumer[i]), 0x0, consumer_func, arg);
     }
 
-    while (isProducerAlive && runningThread > 0)
+    while (runningThread > 0)
     {
         char op[10];
         printf("input option(stat, threads, num N): ");
@@ -373,8 +381,7 @@ int main(int argc, char *argv[])
     pthread_join(producer, 0x0);
     for (int i = 0; i < threadLimit; i++)
     {
-        int status;
-        status = pthread_join(consumer[i], 0x0);
+        pthread_join(consumer[i], 0x0);
     }
 
     printResult();
