@@ -147,6 +147,11 @@ int getNcities(char *arg)
 /* Print min distance, path and number of checked route */
 void printResult()
 {
+    long long total = totalRoute;
+    for (int i = 0; i < threadLimit; i++)
+    {
+        total += checkedRoute[i];
+    }
     printf("\nThe shortest distance: %d\n", min);
     printf("Path: (");
     for (int i = 0; i < size; i++)
@@ -154,7 +159,7 @@ void printResult()
         printf("%d ", minPath[i]);
     }
     printf("%d)\n", minPath[0]);
-    printf("The number of checked route is %lld.\n", totalRoute);
+    printf("The number of checked route is %lld.\n", total);
 }
 
 /* Behavior when SIGINT invoked */
@@ -314,7 +319,7 @@ int main(int argc, char *argv[])
         pthread_create(&(consumer[i]), 0x0, consumer_func, arg);
     }
 
-    while (runningThread > 0)
+    while (runningThread > 0 && isProducerAlive)
     {
         char op[10];
         printf("input option(stat, threads, num N): ");
@@ -334,9 +339,9 @@ int main(int argc, char *argv[])
         else if (op[0] == 'n')
         {
             int newN;
+            printf("input new number of threads: ");
             scanf("%d", &newN);
 
-            printf("%d\n", newN);
             if (threadLimit < newN)
             {
                 for (int i = threadLimit; i < newN; i++)
