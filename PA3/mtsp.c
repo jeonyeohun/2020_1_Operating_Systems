@@ -248,33 +248,32 @@ void *consumer_func(void *ptr)
 {
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    runningThread++;
-    int idx = *(int *)ptr;
     pthread_mutex_t lock;
     pthread_mutex_init(&lock, 0x0);
+
+    runningThread++;
+    int idx = *(int *)ptr;
     checkedRoute[idx] = 0;
+
     while (1)
     {
         int *prefix;
         int path[51] = {0};
         int visited[51] = {0};
         int length = 0;
+
         pthread_mutex_lock(&lock);
         if (queue->num > 0)
         {
             prefix = stopped_prefix_dequeue(queue);
-            pthread_mutex_unlock(&lock);
         }
         else
         {
             if (!isProducerAlive && buf->num == 0)
-            {
-                pthread_mutex_unlock(&(buf->lock));
                 break;
-            }
-            pthread_mutex_unlock(&lock);
             prefix = bounded_buffer_dequeue(buf);
         }
+        pthread_mutex_unlock(&lock);
         pthread_cleanup_push(cleanup_handler, prefix);
 
         for (int i = 0; i < size - MAX_SUBTASK; i++)
