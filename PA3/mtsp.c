@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <limits.h>
 #include <memory.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -252,7 +251,7 @@ void *consumer_func(void *ptr)
     int idx = *(int *)ptr;
 
     runningThread++;
-    while (1)
+    while (isProducerAlive && (buf->num > 0 || queue->num > 0))
     {
         int *prefix;
         int path[51] = {0};
@@ -318,7 +317,7 @@ int main(int argc, char *argv[])
         pthread_create(&(consumer[i]), 0x0, consumer_func, arg);
     }
 
-    while (runningThread > 0 && isProducerAlive)
+    while (runningThread > 0 || isProducerAlive)
     {
         char op[10];
         printf("input option(stat, threads, num N): ");
