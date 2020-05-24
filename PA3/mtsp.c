@@ -250,7 +250,6 @@ void *consumer_func(void *ptr)
     pthread_mutex_init(&lock, 0x0);
 
     int idx = *(int *)ptr;
-    checkedRoute[idx] = 0;
 
     runningThread++;
     while (1)
@@ -356,6 +355,7 @@ int main(int argc, char *argv[])
                 for (int i = threadLimit - 1; i >= newN; i--)
                 {
                     totalRoute += checkedRoute[i];
+                    checkedRoute[i] = 0;
                     pthread_cancel(consumer[i]);
                 }
             }
