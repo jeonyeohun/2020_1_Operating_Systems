@@ -54,7 +54,6 @@ void stopped_prefix_init(stopped_prefix *queue)
 
 void stopped_prefix_queue(stopped_prefix *queue, int *prefix)
 {
-    sem_wait(&(buf->filled));
     pthread_mutex_lock(&(queue->lock));
 
     (queue->elem)[queue->rear] = (int *)malloc(sizeof(prefix[0]) * size - MAX_SUBTASK);
@@ -63,13 +62,11 @@ void stopped_prefix_queue(stopped_prefix *queue, int *prefix)
     queue->num += 1;
 
     pthread_mutex_unlock(&(queue->lock));
-    sem_post(&(buf->filled));
 }
 
 int *stopped_prefix_dequeue(stopped_prefix *queue)
 {
     int *r = 0x0;
-    sem_wait(&(queue->empty));
     pthread_mutex_lock(&(queue->lock));
 
     r = queue->elem[queue->front];
@@ -77,7 +74,6 @@ int *stopped_prefix_dequeue(stopped_prefix *queue)
     queue->num -= 1;
 
     pthread_mutex_unlock(&(queue->lock));
-    sem_post(&(queue->filled));
     return r;
 }
 
@@ -182,11 +178,10 @@ void _travel(int idx, int *visited, int *path, int length, int tidx)
         pthread_mutex_init(&lock, 0x0);
 
         length += cities[path[idx - 1]][path[idx]]; // Add the last city length
-        pthread_mutex_lock(&(buf->lock));
+
         checkedRoute[tidx]++; // Number of routes that the child process traversed
-        totalRoute++;
-        pthread_mutex_unlock(&(buf->lock));
-        if (min == -1 || min > length)
+	totalRoute++;
+ if (min == -1 || min > length)
         {                                           // Check if the length of current permuation is the best
             min = length;                           // Set the best value
             memcpy(minPath, path, sizeof(minPath)); // Save the best path
@@ -248,6 +243,7 @@ void cleanup_handler(void *arg)
     int prefix[size - MAX_SUBTASK];
     memcpy(prefix, arg, sizeof(prefix));
     stopped_prefix_queue(queue, prefix);
+	runningThread--;
 }
 
 void *consumer_func(void *ptr)
@@ -257,10 +253,10 @@ void *consumer_func(void *ptr)
     pthread_mutex_t lock;
     pthread_mutex_init(&lock, 0x0);
 
-    runningThread++;
     int idx = *(int *)ptr;
     checkedRoute[idx] = 0;
-
+	
+	runningThread++;
     while (1)
     {
         int *prefix;
@@ -279,19 +275,19 @@ void *consumer_func(void *ptr)
                 break;
             prefix = bounded_buffer_dequeue(buf);
         }
-        pthread_mutex_unlock(&lock);
-        pthread_cleanup_push(cleanup_handler, prefix);
-
+      pthread_mutex_unlock(&lock);
+	
         for (int i = 0; i < size - MAX_SUBTASK; i++)
         {
             visited[prefix[i]] = 1;
             path[i] = prefix[i];
         }
+        pthread_cleanup_push(cleanup_handler, prefix);
 
         _travel(size - MAX_SUBTASK, visited, path, length, idx);
-        pthread_cleanup_pop(0);
+pthread_cleanup_pop(0);
     }
-    runningThread--;
+   runningThread--;
     return 0x0;
 }
 
@@ -348,6 +344,8 @@ int main(int argc, char *argv[])
         {
             int newN;
             scanf("%d", &newN);
+
+		printf("%d\n", newN);
             if (threadLimit < newN)
             {
                 for (int i = threadLimit; i < newN; i++)
