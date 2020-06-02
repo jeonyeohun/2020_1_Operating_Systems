@@ -56,12 +56,25 @@ void addNode(unsigned long int tid, int* lid){
 
 
 void deleteNode(unsigned long int tid, int* lid){
+	int newParent;
 	for (int i = 0 ; i < nodeList_len ; i++){
 		if (nodeList[i].lockID == lid){
 			parent[i] = i;
 			nodeList[i].ownerThread = 0;
+
+			for (int j = 0 ; j < nodeList_len ; j++){
+				if (i!=j && parent[j] == i){
+					newParent = j;			
+				}
+			}
+			for (int j = 0 ; j < nodeList_len ; j++){
+				if (i!=j && parent[j] == i){
+					parent[j] = newParent;	
+				}
+			}
 		}
 	}
+
 }
 
 int isHold(unsigned long int tid, int* lid){
@@ -100,7 +113,22 @@ void lock_behavior(unsigned long int tid, int* lid){
 		
 		}
 	
+	}
+	for (int i = 0 ; i < 10 ; i++){
+		printf("%d ",parent[i]);
 	}	
+	printf("\n");
+
+	for (int i = 0 ; i < nodeList_len ; i ++){
+		printf("%lu ", nodeList[i].ownerThread);
+	}
+	printf("\n");
+	
+	for (int i = 0 ; i < nodeList_len ; i ++){
+		printf("%p ", nodeList[i].lockID);
+	}
+	printf("\n");
+	
 }
 
 int main () {
