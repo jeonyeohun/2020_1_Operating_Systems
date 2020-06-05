@@ -7,6 +7,7 @@
 #include <fcntl.h>
 
 int pipes[2];
+char *r;
 
 void parent_proc()
 {
@@ -40,13 +41,11 @@ char *child_proc()
 	char buf[32];
 	ssize_t s;
 
-	close(pipes[1]);
-
 	while ((s = read(pipes[0], buf, 31)) > 0)
 	{
 		buf[s + 1] = 0x0;
 	}
-
+	printf("%s", buf);
 	return buf;
 }
 
@@ -55,7 +54,10 @@ read_exec(char *exe)
 {
 	int fd = open("./hello", O_WRONLY | O_CREAT, 0644);
 	dup2(fd, pipes[1]);
-	char *r = child_proc();
+	char *r;
+	read(fd, r, 32);
+	printf("%s", r);
+	child_proc();
 	close(fd);
 	return r;
 }
@@ -73,6 +75,6 @@ int main(int argc, char **argv)
 	s = read_exec(argv[1]);
 	printf("\"%s\"\n", s);
 
-	//free(s);
+	free(s);
 	exit(0);
 }
