@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <dlfcn.h>
+#include <execinfo.h>
 
 typedef struct node{
 	unsigned long int ownerThread;
@@ -16,34 +18,45 @@ typedef struct node{
 
 Node* nodeList [10] = {0x0};
 
+Node* deadlockList[10];
+int deadlockcount= 0;
 int visited[10] = {0};
+int done[10] = {0};
 int nodeCount = 0;
 int targetIdx = -1;
+int cycle = 0;
 
-int isNew(int* lid){
+
+
+int isNew(unsigned long int tid){
 	for (int i = 0 ; i < nodeCount ; i++){
-		if (nodeList[i]->lockID == lid){ 
+		if (nodeList[i]->ownerThread == tid){ 
 			return 0;
 		}
 	}
 	return 1;
 }
 
+void printg(){
+	for(int i = 0 ; i < nodeCount ; i++){
+		printf("%p(%lu) -> ", nodeList[i]->lockID, nodeList[i]->ownerThread);
+		Node* ptr = nodeList[i]->next;
+		while(ptr != NULL){
+			printf("%p(%lu) -> ", ptr->lockID, ptr->ownerThread);
+			ptr = ptr->next;
+		}
+		printf("NULL\n");
+	}	
+
+}
+
+
+
 int searchNode(int *lid ){
 	for (int i = 0 ; i < nodeCount ; i++){
 		if (nodeList[i]->lockID == lid) return i;
 	}
 	return -1;	
-}
-
-void addNode(unsigned long int tid, int* lid){
-	Node *head = (Node*)malloc(sizeof(Node));
-	head->ownerThread = tid;
-	head->lockID = lid;
-	head->next = NULL;
-	
-	nodeList[nodeCount] = head;
-	nodeCount++;
 }
 
 int searchThread(unsigned long int tid){
@@ -53,84 +66,112 @@ int searchThread(unsigned long int tid){
 	return -1;
 }
 
-void addEdge(unsigned long int tid, int* lid){
+
+void addNode(unsigned long int tid, int* lid){
+
+	Node *head = (Node*)malloc(sizeof(Node));
+	head->ownerThread = tid;
+	head->lockID = lid;
+	head->next = NULL;
+	
+	nodeList[nodeCount] = head;
+	nodeCount++;
+
+}
+
+void addEdge(unsigned long int tid, int* lid){	
 	Node* curr = (Node*)malloc(sizeof(Node));
 	curr->ownerThread = tid;
 	curr->lockID = lid;
 	curr->next = NULL;
-
-	if((targetIdx = searchThread(tid)) > 0){
-		Node* ptr;
-		ptr =  nodeList[targetIdx];
 	
-		while(ptr->next != NULL){
-			ptr = ptr->next;
-		}	
-		
-		ptr->next = curr;
-	}
+	targetIdx = searchThread(tid);	
+	Node* ptr;
+	ptr =  nodeList[targetIdx];
+	
+	while(ptr->next != NULL){
+		ptr = ptr->next;
+	}	
+	
+	ptr->next = curr;
+
 }
 
-void deleteNode(unsigned long int tid, int* lid){
-	
-}
-
-
-int dfs(int s){
-	visited[s]++;
-	if(visited[s] > 1) return 1;
+void  dfs(int s){
+	visited[s] = 1;
 	Node* ptr = nodeList[s];
-
-	while(ptr != NULL){
+	deadlockList[deadlockcount++] = nodeList[s];
+	while(ptr->next != NULL){
 		int idx = searchNode(ptr->next->lockID);
-		dfs(idx);
+		if(idx != -1){
+			if(!visited[idx]) dfs(idx);
+			else if(!done[idx]) cycle = 1;
+		}
 		ptr = ptr->next;
 	}
-	return 0;
+	done[s] = 1;
 
 }
 
 int isCycle(unsigned long int tid, int* lid){
 	for (int i = 0 ; i < 10 ; i++){
 		visited[i] = 0;
+		done[i] = 0;
 	}	
 	for (int i = 0 ; i < nodeCount ; i++){
-		if(dfs(i) == 1) return 1;	
+		cycle = 0;
+		dfs(i);
+		
+		if(cycle) return i;
+		deadlockcount = 0;	
 	}
 
-	return 0;
+	return -1;
 }
 
 
 void lock_behavior(unsigned long int tid, int* lid){
-	if(isNew(lid)) addNode(tid, lid);
+	if(isNew(tid)) {
+		addNode(tid, lid);
+	}
+	
 	else {
+		int s;
 		addEdge(tid, lid);
-		if(isCycle(tid, lid)) printf("deadlock\n");
+		if((s = isCycle(tid, lid)) >= 0){
+			printf("====DEADLOCK DETECTED====\n");
+			printf("Below threads and locks are involved in the deadlock \n");
+			for(int i = 0 ;i < deadlockcount ;i++){
+				printf("[%d] Thread: %lu  Lock Address: %p\n",i+1, deadlockList[i]->ownerThread,  deadlockList[i]->lockID);
+			}
+		} 
 	}
 }
 
 void unlock_behavior(unsigned long int tid, int* lid){
-	int delIdx;
-	for (int i = 0 ; i < nodeCount ; i++){
-		if(nodeList[i]->lockID == lid){
-			delIdx = i;	
+	for(int i = 0 ; i < nodeCount ; i++){
+		if(nodeList[i]->lockID == lid && nodeCount != i){
+			for(int j = i ; j < nodeCount ; j++){
+				nodeList[j] = nodeList[j+1];
+			
+			}
+				nodeCount--;
+
 		}
 	}
-	for (int i = delIdx ; i < nodeCount-1 ; i++){
-		nodeList[i] = nodeList[i+1];
-	}
-	nodeCount--;
-
+	
 	for(int i = 0 ; i < nodeCount ; i++){
-		Node* curr = nodeList[i];
+		Node* curr = nodeList[i]->next;
 		Node* prev = nodeList[i];
-		while(curr != NULL && curr->next->lockID != lid ){
+		
+		if(curr == NULL) return;
+		
+		while(curr != NULL && curr->lockID != lid ){
 			curr = curr->next;
 		}
 		
 		if(curr != NULL){
-			while(prev->next == curr){
+			while(prev->next != curr){
 				prev = prev->next;
 			}
 		}
@@ -152,22 +193,13 @@ int main () {
 			break ;
 		if (len > 0){
 			sscanf(buf, "%d %lu %p", &op, &tid, &lid);	
+			printf("%d %lu %p\n", op, tid, lid);
 			if (op == 0) {
 				lock_behavior(tid, lid);
 			}
 			else{
-//				unlock_behavior(tid, lid);
+				unlock_behavior(tid, lid);
 			}
-			printf("\nop: %d tid: %lu, lid: %p\n", op, tid, lid);
-			for(int i = 0 ; i < nodeCount ; i++){
-				printf("%p(%lu) -> ", nodeList[i]->lockID, nodeList[i]->ownerThread);
-				Node* ptr = nodeList[i]->next;
-				while(ptr != NULL){
-					printf("%p(%lu) -> ", ptr->lockID, ptr->ownerThread);
-					ptr = ptr->next;
-				}
-				printf("NULL\n");
-			}	
 		} 
 	}
 	close(fd) ;

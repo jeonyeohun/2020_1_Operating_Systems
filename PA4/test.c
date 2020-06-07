@@ -12,17 +12,15 @@ void *print_message_function1 (void * ptr)
 {
 	char *message;
 	message = (char *) ptr;
-		printf("Thread 1 calls lock x\n");
-		pthread_mutex_lock(&y) ;
+		printf("Thread 1(%lu) calls lock x\n", pthread_self());
+		pthread_mutex_lock(&x) ;
 		printf("Thread 1 gets lock x(%p)\n", &x);
 		printf("Thread 1 calls lock y\n");
-		pthread_mutex_lock(&x) ;
+		pthread_mutex_lock(&y) ;
 		printf("Thread 1 gets lock y(%p)\n", &y);
-		pthread_mutex_lock(&z);
 		printf("%s\n", message) ;
 
-		pthread_mutex_unlock(&z);
-		pthread_mutex_unlock(&x) ;
+		pthread_mutex_unlock(&y) ;
 		printf("Thread 1 release lock y(%p)\n", &y);
 		pthread_mutex_unlock(&x) ;
 		printf("Thread 1 release lock x(%p)\n", &x);
@@ -34,19 +32,17 @@ void *print_message_function2 (void * ptr)
 	message = (char *) ptr;
 
 	int i = 0 ;
-		printf("Thread 2 calls lock y\n");
-		pthread_mutex_lock(&x) ;
+		printf("Thread 2(%lu) calls lock y\n", pthread_self());
+		pthread_mutex_lock(&y) ;
 		printf("Thread 2 gets lock y(%p)\n", &y);
 		printf("Thread 2 calls lock x\n");
-		pthread_mutex_lock(&z) ;
+		pthread_mutex_lock(&x) ;
 		printf("Thread 2 gets lock x(%p)\n", &x);
-		pthread_mutex_lock(&y);
 
 		printf("%s\n", message) ;
-		pthread_mutex_unlock(&y);
-		pthread_mutex_unlock(&z) ;
-		printf("Thread 2 releases lock x(%p)\n", &x);
 		pthread_mutex_unlock(&x) ;
+		printf("Thread 2 releases lock x(%p)\n", &x);
+		pthread_mutex_unlock(&y) ;
 		printf("Thread 2 releases lock y(%p)\n", &y);
 }
 
