@@ -144,7 +144,9 @@ void lock_behavior(unsigned long int tid, int* lid){
 			for(int i = 0 ;i < deadlockcount ;i++){
 				printf("[%d] Thread: %lu  Lock Address: %p\n",i+1, deadlockList[i]->ownerThread,  deadlockList[i]->lockID);
 			}
-		} 
+			deadlockcount = 0;
+		}
+ 
 	}
 }
 
