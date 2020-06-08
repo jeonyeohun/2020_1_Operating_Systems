@@ -26,7 +26,9 @@ int nodeCount = 0;
 int targetIdx = -1;
 int cycle = 0;
 
-
+char target[128];
+char addr[128];
+	
 
 int isNew(unsigned long int tid){
 	for (int i = 0 ; i < nodeCount ; i++){
@@ -144,7 +146,22 @@ void lock_behavior(unsigned long int tid, int* lid){
 			for(int i = 0 ;i < deadlockcount ;i++){
 				printf("[%d] Thread: %lu  Lock Address: %p\n",i+1, deadlockList[i]->ownerThread,  deadlockList[i]->lockID);
 			}
+			
+			char * command = malloc(sizeof(char) * 128);
+			strcpy(command, "addr2line -e ");
+			strcat(command, target);
+			strcat(command, addr);
+
+			FILE *fp = NULL;
+			fp = popen(command, "r");
+			if(!fp) printf("error to print line number");	
+			
+			char result[128];
+			fgets(result, 128, fp);
+			printf("Faulty line: %s\n", result);
+
 			deadlockcount = 0;
+			free(command);
 		}
  
 	}
@@ -153,38 +170,42 @@ void lock_behavior(unsigned long int tid, int* lid){
 void unlock_behavior(unsigned long int tid, int* lid){
 	for(int i = 0 ; i < nodeCount ; i++){
 		if(nodeList[i]->lockID == lid && nodeCount != i){
-			for(int j = i ; j < nodeCount ; j++){
+			for(int j = i ; j < nodeCount-1 ; j++){
 				nodeList[j] = nodeList[j+1];
 			
 			}
-				nodeCount--;
+			nodeCount--;
 
 		}
+		else if(nodeCount == i) nodeCount--;
 	}
-	
+
 	for(int i = 0 ; i < nodeCount ; i++){
 		Node* curr = nodeList[i]->next;
 		Node* prev = nodeList[i];
-		
-		if(curr == NULL) return;
-		
-		while(curr != NULL && curr->lockID != lid ){
+//		printf("1\n");
+		if(curr == NULL) continue;
+		if(curr->lockID == lid) {
+			prev->next = curr->next;
+			continue;
+		}	
+		while(curr != NULL && curr->lockID != lid){
 			curr = curr->next;
 		}
-		
 		if(curr != NULL){
 			while(prev->next != curr){
 				prev = prev->next;
 			}
 		}
-
-		prev->next = curr->next;
+		if(curr == NULL) prev->next = NULL;
+		else prev->next = curr->next;
+//		printg();
 		free(curr);
 	}
 }
 
-int main () {
-	int fd = open("channel", O_RDONLY | O_SYNC);
+int main (int argc, char* argv[]) {
+	int fd = open(".ddtrace", O_RDONLY | O_SYNC);
 	while (1) {
 		unsigned long int tid;
 		int * lid;
@@ -195,14 +216,38 @@ int main () {
 			break ;
 		if (len > 0){
 			sscanf(buf, "%d %lu %p", &op, &tid, &lid);	
-			printf("%d %lu %p\n", op, tid, lid);
+//			if(op!=2) printf("%d %lu %p\n", op, tid, lid);
 			if (op == 0) {
 				lock_behavior(tid, lid);
+//				printg();printf("\n");
 			}
-			else{
+			else if(op == 1){
 				unlock_behavior(tid, lid);
+//				printg();printf("\n");
 			}
-		} 
+			else if(op == 2){
+				int stackTopFlag = 0;
+				for (int i = 0 ; i < tid ; i++){
+					read(fd, buf, 128);
+					if(stackTopFlag == 0){
+						sscanf(buf, "%s %s", target, addr);
+						if(!strncmp(argv[1], target, strlen(argv[1]))){
+							for(int i = 0 ; i< strlen(addr)-1 ; i++){
+								addr[i] = addr[i+1];
+							}
+							target[strlen(target)-2] = ' ';
+							target[strlen(target)-1] = '\0';
+							addr[strlen(addr)-2] = '\0';
+							stackTopFlag = 1;
+						}
+					}
+						
+				}
+//				printg();printf("\n");
+			}
+
+		}
+//		printg(); 
 	}
 	close(fd) ;
 	return 0 ;

@@ -13,11 +13,13 @@
 #include <string.h>
 
 static __thread int n_malloc = 0;
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER ;
+static __thread int n_unlock = 0;
 
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER ;
+pthread_mutex_t unlock = PTHREAD_MUTEX_INITIALIZER ;
 int pthread_mutex_lock(pthread_mutex_t *mutex){
 	int (*pthread_lock_orig)(pthread_mutex_t *mutex);
-	if (mkfifo("channel", 0666)) {
+	if (mkfifo(".ddtrace", 0666)) {
 		if (errno != EEXIST) {
 			perror("fail to open fifo: ") ;
 			exit(1) ;
@@ -25,25 +27,32 @@ int pthread_mutex_lock(pthread_mutex_t *mutex){
 	}
 
 	n_malloc++;
-	if(n_malloc == 1){
+	if(n_malloc == 1 && n_unlock == 0){
 		pthread_mutex_lock(&lock);
-        	int fd = open("channel", O_WRONLY | O_SYNC);	
+        	int fd = open(".ddtrace", O_WRONLY | O_SYNC);	
 		char buf [128];
 		sprintf(buf, "0 %lu %p\n", pthread_self(), mutex);
 		write(fd, buf, 128);
-		close(fd);		
-		pthread_mutex_unlock(&lock);
-
+		printf("pick %p\n", mutex);
 		void *arr[10];
 		char **stack;
-		printf("write done\n");			
 		size_t sz = backtrace(arr, 10);
 		stack = backtrace_symbols(arr, sz);
-		printf("backtrace\n");
-		for (int i = 0; i < sz; i++)
-			printf("[%d] %s\n", i, stack[i]);
+		
+
+		char tot_size[50];
+		sprintf(tot_size, "2 %lu %p", sz, mutex);
+		write(fd, tot_size, 128);
 
 
+		for (int i = 0; i < sz; i++){
+			char line[128];
+			sprintf(line, "%s", stack[i]);
+			write(fd, line, 128);
+		}
+		close(fd);
+	
+		pthread_mutex_unlock(&lock);
 	}
 	
 	pthread_lock_orig = dlsym(RTLD_NEXT, "pthread_mutex_lock");
@@ -55,15 +64,17 @@ int pthread_mutex_lock(pthread_mutex_t *mutex){
 int pthread_mutex_unlock(pthread_mutex_t *mutex){	
 	int (*pthread_unlock_orig)(pthread_mutex_t *mutex);
 	pthread_unlock_orig = dlsym(RTLD_NEXT, "pthread_mutex_unlock");
-	
-	if(n_malloc == 0){
+	n_unlock++;	
+	if(n_malloc == 0 && n_unlock == 1){
+	pthread_mutex_lock(&unlock);
+		printf("%p putdown\n", mutex);
 		char buf [128];	
-		int fd = open("channel", O_WRONLY | O_SYNC) ;
+		int fd = open(".ddtrace", O_WRONLY | O_SYNC) ;
 		sprintf(buf, "1 %lu %p", pthread_self(), mutex);
 		write(fd, buf, 128);
 		close(fd);
+	pthread_mutex_unlock(&unlock);
 	}
-
-	int result = pthread_unlock_orig(mutex);
-	return result;
+n_unlock--;
+	return pthread_unlock_orig(mutex);
 }

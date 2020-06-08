@@ -28,14 +28,14 @@ chopstick_init(chopstick_t * c)
 void
 thinking()
 {
-//	usleep(rand() % 1000) ;
+//	usleep(1) ;
 }
 
 void
 eating(int phid)
 {
-	printf("Philosopher %d eats.\n", phid) ;
-//	usleep(rand() % 1000) ;
+	printf("Philosopher %d(%lu) eats.\n", phid, pthread_self()) ;
+//	usleep(1) ;
 }
 
 void
@@ -43,9 +43,11 @@ pickup(int phid)
 {
 	int left = phid ;
 	int right = (phid + 1) % 5 ;
-
+	
 	pthread_mutex_lock(&(chopstick[left].mutex)) ;
+	printf("Philosopher %d picked up left\n", phid);
 	pthread_mutex_lock(&(chopstick[right].mutex)) ;
+	printf("Philosopher %d picked up right\n", phid);
 }
 
 void
@@ -55,7 +57,9 @@ putdown(int phid)
 	int right = (phid + 1) % 5 ;
 
 	pthread_mutex_unlock(&(chopstick[right].mutex)) ;
+	printf("Philosopher %d putdown left\n", phid);
 	pthread_mutex_unlock(&(chopstick[left].mutex)) ;
+	printf("Philosopher %d putdown right\n", phid);
 }
 
 void *

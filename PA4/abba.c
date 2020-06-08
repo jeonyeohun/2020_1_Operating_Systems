@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <sched.h>
 
+
 pthread_mutex_t	x = PTHREAD_MUTEX_INITIALIZER ;
 pthread_mutex_t y = PTHREAD_MUTEX_INITIALIZER ;
 pthread_mutex_t z = PTHREAD_MUTEX_INITIALIZER ;
