@@ -11,6 +11,9 @@
 #include <dlfcn.h>
 #include <execinfo.h>
 #include <string.h>
+#include <sys/syscall.h>
+
+#define gettid() syscall(SYS_gettid)
 
 static __thread int n_malloc = 0;
 static __thread int n_unlock = 0;
@@ -31,15 +34,17 @@ int pthread_mutex_lock(pthread_mutex_t *mutex){
 		pthread_mutex_lock(&lock);
         	int fd = open(".ddtrace", O_WRONLY | O_SYNC);	
 		char buf [128];
-		sprintf(buf, "0 %lu %p\n", pthread_self(), mutex);
+//		if (mutex->__data.__owner == 0) 
+			sprintf(buf, "0 %ld %d\n", gettid(), mutex);
+//		if (mutex->__data.__owner > 0) 
+//			sprintf(buf, "1 %ld %d\n", gettid(), mutex);
+
 		write(fd, buf, 128);
-		printf("pick %p\n", mutex);
+
 		void *arr[10];
 		char **stack;
 		size_t sz = backtrace(arr, 10);
 		stack = backtrace_symbols(arr, sz);
-		
-
 		char tot_size[50];
 		sprintf(tot_size, "2 %lu %p", sz, mutex);
 		write(fd, tot_size, 128);
@@ -57,7 +62,8 @@ int pthread_mutex_lock(pthread_mutex_t *mutex){
 	
 	pthread_lock_orig = dlsym(RTLD_NEXT, "pthread_mutex_lock");
 	n_malloc--;
-	return pthread_lock_orig(mutex);
+	int r = pthread_lock_orig(mutex);
+	return r;
 }
 
 
@@ -67,14 +73,13 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex){
 	n_unlock++;	
 	if(n_malloc == 0 && n_unlock == 1){
 	pthread_mutex_lock(&unlock);
-		printf("%p putdown\n", mutex);
 		char buf [128];	
 		int fd = open(".ddtrace", O_WRONLY | O_SYNC) ;
-		sprintf(buf, "1 %lu %p", pthread_self(), mutex);
+		sprintf(buf, "3 %ld %d", gettid(), mutex);
 		write(fd, buf, 128);
 		close(fd);
 	pthread_mutex_unlock(&unlock);
 	}
-n_unlock--;
+	n_unlock--;
 	return pthread_unlock_orig(mutex);
 }

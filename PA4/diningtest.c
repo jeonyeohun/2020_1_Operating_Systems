@@ -34,8 +34,8 @@ thinking()
 void
 eating(int phid)
 {
-	printf("Philosopher %d(%lu) eats.\n", phid, pthread_self()) ;
-//	usleep(1) ;
+	printf("Philosopher %d eats.\n", phid) ;
+	usleep(1) ;
 }
 
 void

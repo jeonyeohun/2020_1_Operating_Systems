@@ -10,222 +10,190 @@
 #include <dlfcn.h>
 #include <execinfo.h>
 
-typedef struct node{
-	unsigned long int ownerThread;
-	int* lockID;
-	struct node* next;
+typedef struct Node{
+	int vertex;
+	struct Node *next;
 }Node;
 
-Node* nodeList [10] = {0x0};
+Node* edges [20];
+Node* deadlockList[20];
+int edgeCount = 0;
+int deadlockCount = 0;
 
-Node* deadlockList[10];
-int deadlockcount= 0;
-int visited[10] = {0};
-int done[10] = {0};
-int nodeCount = 0;
-int targetIdx = -1;
 int cycle = 0;
-
 char target[128];
 char addr[128];
-	
 
-int isNew(unsigned long int tid){
-	for (int i = 0 ; i < nodeCount ; i++){
-		if (nodeList[i]->ownerThread == tid){ 
-			return 0;
-		}
-	}
-	return 1;
-}
-
-void printg(){
-	for(int i = 0 ; i < nodeCount ; i++){
-		printf("%p(%lu) -> ", nodeList[i]->lockID, nodeList[i]->ownerThread);
-		Node* ptr = nodeList[i]->next;
-		while(ptr != NULL){
-			printf("%p(%lu) -> ", ptr->lockID, ptr->ownerThread);
-			ptr = ptr->next;
-		}
-		printf("NULL\n");
-	}	
-
-}
-
-
-
-int searchNode(int *lid ){
-	for (int i = 0 ; i < nodeCount ; i++){
-		if (nodeList[i]->lockID == lid) return i;
+int searchNode(int node){
+	for (int i = 0 ; i < edgeCount ; i++){
+		if (edges[i]->vertex == node) return i;
 	}
 	return -1;	
 }
 
-int searchThread(unsigned long int tid){
-	for (int i = 0 ; i < nodeCount ; i++){
-		if (nodeList[i]->ownerThread == tid) return i;
-	}
-	return -1;
-}
-
-
-void addNode(unsigned long int tid, int* lid){
-
-	Node *head = (Node*)malloc(sizeof(Node));
-	head->ownerThread = tid;
-	head->lockID = lid;
-	head->next = NULL;
-	
-	nodeList[nodeCount] = head;
-	nodeCount++;
-
-}
-
-void addEdge(unsigned long int tid, int* lid){	
-	Node* curr = (Node*)malloc(sizeof(Node));
-	curr->ownerThread = tid;
-	curr->lockID = lid;
-	curr->next = NULL;
-	
-	targetIdx = searchThread(tid);	
-	Node* ptr;
-	ptr =  nodeList[targetIdx];
-	
-	while(ptr->next != NULL){
-		ptr = ptr->next;
-	}	
-	
-	ptr->next = curr;
-
-}
-
-void  dfs(int s){
+void dfs(int s, int* visited){
 	visited[s] = 1;
-	Node* ptr = nodeList[s];
-	deadlockList[deadlockcount++] = nodeList[s];
-	while(ptr->next != NULL){
-		int idx = searchNode(ptr->next->lockID);
-		if(idx != -1){
-			if(!visited[idx]) dfs(idx);
-			else if(!done[idx]) cycle = 1;
+	Node* ptr = edges[s]->next;
+	while(ptr != NULL){
+		int idx = searchNode(ptr->vertex);
+			if(idx != -1){
+			printf("%d %d\n", idx, ptr->vertex, );
+	if(!visited[idx]) dfs(idx, visited);
+			else cycle = 1;
 		}
 		ptr = ptr->next;
 	}
-	done[s] = 1;
-
 }
 
-int isCycle(unsigned long int tid, int* lid){
-	for (int i = 0 ; i < 10 ; i++){
-		visited[i] = 0;
-		done[i] = 0;
-	}	
-	for (int i = 0 ; i < nodeCount ; i++){
-		cycle = 0;
-		dfs(i);
+
+void printg(){
+	for (int i = 0 ; i < edgeCount ; i++){
+		Node* ptr = edges[i];
 		
-		if(cycle) return i;
-		deadlockcount = 0;	
+		while(ptr != NULL){
+			printf("%d->", ptr->vertex);
+			ptr = ptr->next;
+		}
+		printf("NULL \n");
+	}
+}
+
+void detectCycle(){
+
+	for (int i = 0 ; i < edgeCount ; i++){
+		int visited[20] = {0,};
+		visited[i] = 1;	
+		cycle = 0;
+		dfs(i, visited);	
+		if(cycle) break;
+		deadlockCount = 0;	
 	}
 
-	return -1;
+	if(cycle){
+		printf("====DEADLOCK DETECTED====\n");
+		printf("Below threads and locks are involved in the deadlock \n");
+					
+		char * command = malloc(sizeof(char) * 128);
+		strcpy(command, "addr2line -e ");
+		strcat(command, target);
+		strcat(command, addr);
+
+		FILE *fp = NULL;
+		fp = popen(command, "r");
+		if(!fp) printf("error to print line number");	
+					
+		char result[128];
+		fgets(result, 128, fp);
+		printf("Faulty line: %s\n", result);
+
+		deadlockCount = 0;
+		free(command);
+				
+	}
+}
+
+		/* delete T-R Edge */
+	void releaseRequestEdge(int T, int R){
+			int idx = searchNode(T);
+
+			Node* head = edges[idx];
+			head->next = head->next->next;
+			
+			if (head->next == NULL){
+				for(int i = idx ; i < edgeCount-1 ; i++){
+					edges[i] = edges[i+1];
+				}
+				edgeCount--;
+			}
+				
+		//	printg();
+}
+/* T-R Edge */
+void requestEdge(int T, int R){
+	Node* nodeR = (Node*)malloc(sizeof(Node));
+	nodeR->vertex = R;
+	nodeR->next = NULL;
+
+	int idx = searchNode(T);
+
+	if(idx < 0){
+		Node* nodeT = (Node*)malloc(sizeof(Node));
+		nodeT->vertex = T;
+		nodeT->next = nodeR;
+
+		edges[edgeCount++] = nodeT;
+		return;
+
+	}	
+
+	Node* ptr = edges[idx];
+	while(ptr->next != NULL){
+		ptr = ptr->next;
+		printf("???\n");
+	}
+	ptr->next = nodeR;	
+	detectCycle();
+//	printg();
 }
 
 
-void lock_behavior(unsigned long int tid, int* lid){
-	if(isNew(tid)) {
-		addNode(tid, lid);
-	}
+/* R-T Edge */
+void assignmentEdge(int T, int R){
+	if(searchNode(R)!=-1){
+		requestEdge(T, R);
+		detectCycle();
+		return;
+	}		
+	Node* nodeT = (Node*)malloc(sizeof(Node));
+	nodeT->vertex = T;
+	nodeT->next = NULL;
+
+	Node* nodeR = (Node*)malloc(sizeof(Node));
+	nodeR->vertex = R;
+	nodeR->next = nodeT;
 	
-	else {
-		int s;
-		addEdge(tid, lid);
-		if((s = isCycle(tid, lid)) >= 0){
-			printf("====DEADLOCK DETECTED====\n");
-			printf("Below threads and locks are involved in the deadlock \n");
-			for(int i = 0 ;i < deadlockcount ;i++){
-				printf("[%d] Thread: %lu  Lock Address: %p\n",i+1, deadlockList[i]->ownerThread,  deadlockList[i]->lockID);
-			}
-			
-			char * command = malloc(sizeof(char) * 128);
-			strcpy(command, "addr2line -e ");
-			strcat(command, target);
-			strcat(command, addr);
+	edges[edgeCount++] = nodeR;
 
-			FILE *fp = NULL;
-			fp = popen(command, "r");
-			if(!fp) printf("error to print line number");	
-			
-			char result[128];
-			fgets(result, 128, fp);
-			printf("Faulty line: %s\n", result);
-
-			deadlockcount = 0;
-			free(command);
-		}
- 
-	}
+	detectCycle();	
+//	printg();	
 }
 
-void unlock_behavior(unsigned long int tid, int* lid){
-	for(int i = 0 ; i < nodeCount ; i++){
-		if(nodeList[i]->lockID == lid && nodeCount != i){
-			for(int j = i ; j < nodeCount-1 ; j++){
-				nodeList[j] = nodeList[j+1];
-			
-			}
-			nodeCount--;
+/* delete R-T Edge */
+void releaseAssignmentEdge(int T, int R){
+	int idx = searchNode(R);
 
-		}
-		else if(nodeCount == i) nodeCount--;
+	for (int i = idx ; i < edgeCount-1 ; i++){
+		edges[i] = edges[i+1];
 	}
+	edgeCount--;
 
-	for(int i = 0 ; i < nodeCount ; i++){
-		Node* curr = nodeList[i]->next;
-		Node* prev = nodeList[i];
-//		printf("1\n");
-		if(curr == NULL) continue;
-		if(curr->lockID == lid) {
-			prev->next = curr->next;
-			continue;
-		}	
-		while(curr != NULL && curr->lockID != lid){
-			curr = curr->next;
+	for (int i = 0 ; i < edgeCount ; i++){
+		if(edges[i]->next->vertex == R){
+			assignmentEdge(edges[i]->vertex, R);
+			releaseRequestEdge(edges[i]->vertex, edges[i]->next->vertex);
+			break;
 		}
-		if(curr != NULL){
-			while(prev->next != curr){
-				prev = prev->next;
-			}
-		}
-		if(curr == NULL) prev->next = NULL;
-		else prev->next = curr->next;
-//		printg();
-		free(curr);
 	}
+//	printg();
 }
+
+
+
 
 int main (int argc, char* argv[]) {
 	int fd = open(".ddtrace", O_RDONLY | O_SYNC);
 	while (1) {
-		unsigned long int tid;
-		int * lid;
+		int tid;
+		int lid;
 		char buf[128];
 		int len =0;
 		int op;
 		if ((len = read(fd, buf, 128)) == -1)
 			break ;
 		if (len > 0){
-			sscanf(buf, "%d %lu %p", &op, &tid, &lid);	
-//			if(op!=2) printf("%d %lu %p\n", op, tid, lid);
-			if (op == 0) {
-				lock_behavior(tid, lid);
-//				printg();printf("\n");
-			}
-			else if(op == 1){
-				unlock_behavior(tid, lid);
-//				printg();printf("\n");
-			}
-			else if(op == 2){
+			sscanf(buf, "%d %d %d", &op, &tid, &lid);	
+			 printf("%d %d %d\n", op, tid, lid);
+			 if(op == 2){
 				int stackTopFlag = 0;
 				for (int i = 0 ; i < tid ; i++){
 					read(fd, buf, 128);
@@ -243,11 +211,20 @@ int main (int argc, char* argv[]) {
 					}
 						
 				}
-//				printg();printf("\n");
 			}
-
+			if (op == 0) {
+				assignmentEdge(tid, lid);
+				printg();printf("\n");
+			}
+			else if (op == 1){
+				requestEdge(tid, lid);
+				printg();printf("\n");
+			}
+			else if (op ==3){
+				releaseAssignmentEdge(tid, lid);
+				printg();printf("\n");
+			}	
 		}
-//		printg(); 
 	}
 	close(fd) ;
 	return 0 ;
