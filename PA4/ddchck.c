@@ -28,6 +28,7 @@ int cycle = 0;
 char target[128];
 char addr[128];
 
+
 int searchLock(int *lock)
 {
 	for (int i = 0; i < edgeCount; i++)
@@ -56,7 +57,7 @@ int getIndex(Node *ptr)
 void dfs(int s, int *discovered, int *finished)
 {
 	discovered[s] = 1;
-	deadlockList[deadlockCount] = edges[s];
+	deadlockList[deadlockCount++] = edges[s];
 	Node *ptr = edges[s]->next;
 	while (ptr != NULL)
 	{
@@ -92,6 +93,8 @@ void detectCycle()
 
 	if (cycle)
 	{
+int		tcount = 1;
+int		mcount = 1;
 		printf("===============  DEADLOCK DETECTED  ================\n");
 		printf("Below threads and locks are involved in the deadlock\n");
 		printf("____________________________________________________\n");
@@ -99,14 +102,14 @@ void detectCycle()
 		{
 			if (edges[i]->lockAddress == NULL)
 			{
-				printf("Thread[%d]: %lu\n", i + 1, edges[i]->tid);
+				printf("Thread[%d]: %lu\n", tcount++, edges[i]->tid);
 			}
 		}
 		for (int i = 0; i < deadlockCount; i++)
 		{
 			if (edges[i]->tid == -1)
 			{
-				printf("Mutex[%d]: %p\n", i + 1, edges[i]->lockAddress);
+				printf("Mutex[%d]: %p\n", mcount++, edges[i]->lockAddress);
 			}
 		}
 
@@ -114,6 +117,7 @@ void detectCycle()
 		char *command = malloc(sizeof(char) * 128);
 		strcpy(command, "addr2line -e ");
 		strcat(command, target);
+		strcat(command, " ");
 		strcat(command, addr);
 
 		FILE *fp = NULL;
@@ -123,7 +127,7 @@ void detectCycle()
 
 		char result[128];
 		fgets(result, 128, fp);
-		printf("Faulty line: %s\n", result);
+		printf("Faulty Line Number: %s\n", result);
 
 		deadlockCount = 0;
 		free(command);
@@ -208,7 +212,7 @@ void releaseAssignmentEdge(uli T, int *R)
 	int idx = searchLock(R);
 
 	for (int i = idx; i < edgeCount - 1; i++)
-	{
+	{	
 		edges[i] = edges[i + 1];
 	}
 	edgeCount--;
@@ -217,7 +221,7 @@ void releaseAssignmentEdge(uli T, int *R)
 	{
 		if (edges[i]->next->lockAddress == R)
 		{
-			int tempT = edges[i]->tid;
+			uli tempT = edges[i]->tid;
 			releaseRequestEdge(edges[i]->tid, edges[i]->next->lockAddress);
 			assignmentEdge(tempT, R);
 			break;
@@ -226,15 +230,21 @@ void releaseAssignmentEdge(uli T, int *R)
 	detectCycle();
 }
 
-void processString()
+void processString(char * btrace, char * filename)
 {
-	for (int i = 0; i < strlen(addr) - 1; i++)
-	{
-		addr[i] = addr[i + 1];
+	char *ptr;
+	ptr = strstr(btrace, filename);
+	strncpy(target, ptr, strlen(filename));
+	ptr = strstr(ptr, "[");
+	char temp[20];
+	int i = 0;
+	ptr = ptr+1;
+	while(*ptr !=']'){
+		temp[i++] = *ptr;
+		ptr++;
 	}
-	target[strlen(target) - 2] = ' ';
-	target[strlen(target) - 1] = '\0';
-	addr[strlen(addr) - 2] = '\0';
+	temp[i] = '\0';
+	strcpy(addr, temp);
 }
 
 int main(int argc, char *argv[])
@@ -245,40 +255,30 @@ int main(int argc, char *argv[])
 	{
 		uli tid;
 		int *lid;
+				char btrace[512];
 
-		char buf[128];
+		char buf[512];
 		int len = 0;
 		int op;
 
-		if ((len = read(fd, buf, 128)) == -1)
+		if ((len = read(fd, buf, 512)) == -1)
 			break;
 		if (len > 0)
 		{
-			sscanf(buf, "%d %lu %p", &op, &tid, &lid);
-
+			sscanf(buf, "%d", &op);
 			switch (op)
 			{
 			case 0:
+				sscanf(buf, "%d %lu %p", &op, &tid, &lid);
 				assignmentEdge(tid, lid);
 				break;
 			case 1:
+				sscanf(buf, "%d %lu %p",&op, &tid, &lid);
 				releaseAssignmentEdge(tid, lid);
 				break;
 			case 2:
-				int targetFlag = 0;
-				for (int i = 0; i < tid; i++)
-				{
-					read(fd, buf, 128);
-					if (targetFlag == 0)
-					{
-						sscanf(buf, "%s %s", target, addr);
-						if (!strncmp(argv[1], target, strlen(argv[1])))
-						{
-							processString();
-							targetFlag = 1;
-						}
-					}
-				}
+				strcpy(btrace, buf);
+				processString(btrace, argv[1]);
 				break;
 			}
 		}
