@@ -48,7 +48,7 @@ int searchThread(long int tid)
 
 int getIndex(Node *ptr)
 {
-	return (ptr->lockAddress != NULL) ? searchLock(ptr->lockAddress) : searchLock(ptr->tid);
+	return (ptr->lockAddress != NULL) ? searchLock(ptr->lockAddress) : searchThread(ptr->tid);
 }
 
 void dfs(int s, int *discovered, int *finished)
@@ -79,7 +79,7 @@ void printg()
 
 		while (ptr != NULL)
 		{
-			ptr->lockAddress != NULL ? printf("%p->", ptr->lockAddress) : printf("%p->", ptr->tid);
+			ptr->lockAddress != NULL ? printf("%p->", ptr->lockAddress) : printf("%ld->", ptr->tid);
 			ptr = ptr->next;
 		}
 		printf("NULL \n");
@@ -152,11 +152,11 @@ void releaseRequestEdge(long int T, int *R)
 }
 
 /* T-R Edge */
-void requestEdge(int T, int R)
+void requestEdge(long int T, int *R)
 {
 	Node *nodeR = (Node *)malloc(sizeof(Node));
 	nodeR->lockAddress = R;
-	nodeR->tid = NULL;
+	nodeR->tid = -1;
 	nodeR->next = NULL;
 
 	int idx = searchThread(T);
@@ -182,9 +182,9 @@ void requestEdge(int T, int R)
 }
 
 /* R-T Edge */
-void assignmentEdge(int T, int R)
+void assignmentEdge(long int T, int *R)
 {
-	if (searchNode(R) != -1)
+	if (searchLock(R) != -1)
 	{
 		requestEdge(T, R);
 		detectCycle();
@@ -197,7 +197,7 @@ void assignmentEdge(int T, int R)
 
 	Node *nodeR = (Node *)malloc(sizeof(Node));
 	nodeR->lockAddress = R;
-	nodeR->tid = NULL;
+	nodeR->tid = -1;
 	nodeR->next = nodeT;
 
 	edges[edgeCount++] = nodeR;
@@ -207,9 +207,9 @@ void assignmentEdge(int T, int R)
 }
 
 /* delete R-T Edge */
-void releaseAssignmentEdge(int T, int R)
+void releaseAssignmentEdge(long int T, int *R)
 {
-	int idx = searchNode(R);
+	int idx = searchLock(R);
 
 	for (int i = idx; i < edgeCount - 1; i++)
 	{
