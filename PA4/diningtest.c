@@ -5,7 +5,7 @@
 #include <pthread.h>
 #define LEFT(i) (i)
 #define RIGHT(i) ((i+1) % 5)
-
+int cnt = 0;
 typedef enum {
 	avail, 
 	held 
@@ -60,7 +60,11 @@ putdown(int phid)
 	printf("Philosopher %d putdown left\n", phid);
 	pthread_mutex_unlock(&(chopstick[left].mutex)) ;
 	printf("Philosopher %d putdown right\n", phid);
+	cnt+=2;
+
+	printf("%d\n", cnt);
 }
+
 
 void *
 philosopher(void * arg)
