@@ -34,27 +34,23 @@ int pthread_mutex_lock(pthread_mutex_t *mutex){
 		pthread_mutex_lock(&lock);
         	int fd = open(".ddtrace", O_WRONLY | O_SYNC);	
 		char buf [128];
-//		if (mutex->__data.__owner == 0) 
-			sprintf(buf, "0 %ld %p\n", gettid(), mutex);
-//		if (mutex->__data.__owner > 0) 
-//			sprintf(buf, "1 %ld %d\n", gettid(), mutex);
-printf("%s\n", buf);
+		sprintf(buf, "0 %lu %p", pthread_self(), mutex);
 		write(fd, buf, 128);
+		printf("ddmon: %s\n",buf);
 
 		void *arr[10];
 		char **stack;
 		size_t sz = backtrace(arr, 10);
 		stack = backtrace_symbols(arr, sz);
-		char tot_size[50];
+		char tot_size[128];
 		sprintf(tot_size, "2 %lu", sz);
-		write(fd, tot_size, 128);
-
+		write(fd, tot_size,128);
 
 		for (int i = 0; i < sz; i++){
-			char line[128];
-			sprintf(line, "%s", stack[i]);
-			write(fd, line, 128);
+			sprintf(tot_size, "%s", stack[i]);
+			write(fd, tot_size, 128);
 		}
+
 		close(fd);
 	
 		pthread_mutex_unlock(&lock);
@@ -75,8 +71,9 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex){
 	pthread_mutex_lock(&unlock);
 		char buf [128];	
 		int fd = open(".ddtrace", O_WRONLY | O_SYNC) ;
-		sprintf(buf, "3 %ld %p", gettid(), mutex);
+		sprintf(buf, "3 %lu %p", pthread_self(), mutex);
 		write(fd, buf, 128);
+		printf("ddmon: %s\n",buf);
 		close(fd);
 	pthread_mutex_unlock(&unlock);
 	}

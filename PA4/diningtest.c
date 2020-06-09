@@ -35,7 +35,7 @@ void
 eating(int phid)
 {
 	printf("Philosopher %d eats.\n", phid) ;
-	usleep(1) ;
+//	sleep(0.3) ;
 }
 
 void

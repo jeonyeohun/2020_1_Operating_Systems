@@ -10,10 +10,12 @@
 #include <dlfcn.h>
 #include <execinfo.h>
 
+#define uli unsigned long int
+
 typedef struct Node
 {
 	int *lockAddress;
-	long int tid;
+	uli tid;
 	struct Node *next;
 } Node;
 
@@ -36,7 +38,7 @@ int searchLock(int *lock)
 	return -1;
 }
 
-int searchThread(long int tid)
+int searchThread(uli tid)
 {
 	for (int i = 0; i < edgeCount; i++)
 	{
@@ -127,14 +129,14 @@ int detectCycle()
 		deadlockCount = 0;
 		free(command);
 
-		exit(0);
+//		exit(0);
 		return 1;
 	}
 	return 0;
 }
 
 /* delete T-R Edge */
-void releaseRequestEdge(long int T, int *R)
+void releaseRequestEdge(uli T, int *R)
 {
 	int idx = searchThread(T);
 
@@ -152,7 +154,7 @@ void releaseRequestEdge(long int T, int *R)
 }
 
 /* T-R Edge */
-void requestEdge(long int T, int *R)
+void requestEdge(uli T, int *R)
 {
 	Node *nodeR = (Node *)malloc(sizeof(Node));
 	nodeR->lockAddress = R;
@@ -182,7 +184,7 @@ void requestEdge(long int T, int *R)
 }
 
 /* R-T Edge */
-void assignmentEdge(long int T, int *R)
+void assignmentEdge(uli T, int *R)
 {
 	if (searchLock(R) != -1)
 	{
@@ -207,7 +209,7 @@ void assignmentEdge(long int T, int *R)
 }
 
 /* delete R-T Edge */
-void releaseAssignmentEdge(long int T, int *R)
+void releaseAssignmentEdge(uli T, int *R)
 {
 	int idx = searchLock(R);
 
@@ -238,7 +240,7 @@ int main(int argc, char *argv[])
 	int fd = open(".ddtrace", O_RDONLY | O_SYNC);
 	while (1)
 	{
-		long int tid;
+		uli tid;
 		int *lid;
 
 		char buf[128];
@@ -249,8 +251,8 @@ int main(int argc, char *argv[])
 			break;
 		if (len > 0)
 		{
-			sscanf(buf, "%d %ld %p", &op, &tid, &lid);
-			printf("%d %ld %p\n", op, tid, lid);
+			sscanf(buf, "%d %lu %p", &op, &tid, &lid);
+			printf("%d %lu %p\n", op, tid, lid);
 			if (op == 2)
 			{
 				int stackTopFlag = 0;
@@ -260,6 +262,7 @@ int main(int argc, char *argv[])
 					if (stackTopFlag == 0)
 					{
 						sscanf(buf, "%s %s", target, addr);
+						printf("%s %s\n", target, addr);
 						if (!strncmp(argv[1], target, strlen(argv[1])))
 						{
 							for (int i = 0; i < strlen(addr) - 1; i++)
@@ -277,12 +280,6 @@ int main(int argc, char *argv[])
 			else if (op == 0)
 			{
 				assignmentEdge(tid, lid);
-				printg();
-				printf("\n");
-			}
-			else if (op == 1)
-			{
-				requestEdge(tid, lid);
 				printg();
 				printf("\n");
 			}
