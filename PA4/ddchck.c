@@ -56,11 +56,11 @@ int getIndex(Node *ptr)
 void dfs(int s, int *discovered, int *finished)
 {
 	discovered[s] = 1;
+	deadlockList[deadlockCount] = edges[s];
 	Node *ptr = edges[s]->next;
 	while (ptr != NULL)
 	{
 		int idx = getIndex(ptr);
-		//		printf("iudx: %d %d\n", idx, ptr->vertex);
 		if (idx != -1)
 		{
 			if (!discovered[idx])
@@ -73,24 +73,8 @@ void dfs(int s, int *discovered, int *finished)
 	finished[s] = 1;
 }
 
-void printg()
+void detectCycle()
 {
-	for (int i = 0; i < edgeCount; i++)
-	{
-		Node *ptr = edges[i];
-
-		while (ptr != NULL)
-		{
-			ptr->lockAddress != NULL ? printf("%p->", ptr->lockAddress) : printf("%ld->", ptr->tid);
-			ptr = ptr->next;
-		}
-		printf("NULL \n");
-	}
-}
-
-int detectCycle()
-{
-
 	for (int i = 0; i < edgeCount; i++)
 	{
 		int discovered[20] = {
@@ -108,10 +92,25 @@ int detectCycle()
 
 	if (cycle)
 	{
-		printf("====DEADLOCK DETECTED====\n");
-		printf("Below threads and locks are involved in the deadlock \n");
-		printg();
-		printf("====\n");
+		printf("===============  DEADLOCK DETECTED  ================\n");
+		printf("Below threads and locks are involved in the deadlock\n");
+		printf("____________________________________________________\n");
+		for (int i = 0; i < deadlockCount; i++)
+		{
+			if (edges[i]->lockAddress == NULL)
+			{
+				printf("Thread[%d]: %lu\n", i + 1, edges[i]->tid);
+			}
+		}
+		for (int i = 0; i < deadlockCount; i++)
+		{
+			if (edges[i]->tid == -1)
+			{
+				printf("Mutex[%d]: %p\n", i + 1, edges[i]->lockAddress);
+			}
+		}
+
+		printf("====================================================\n");
 		char *command = malloc(sizeof(char) * 128);
 		strcpy(command, "addr2line -e ");
 		strcat(command, target);
@@ -128,11 +127,7 @@ int detectCycle()
 
 		deadlockCount = 0;
 		free(command);
-
-//		exit(0);
-		return 1;
 	}
-	return 0;
 }
 
 /* delete T-R Edge */
@@ -205,7 +200,6 @@ void assignmentEdge(uli T, int *R)
 	edges[edgeCount++] = nodeR;
 
 	detectCycle();
-	//	printg();
 }
 
 /* delete R-T Edge */
@@ -229,9 +223,18 @@ void releaseAssignmentEdge(uli T, int *R)
 			break;
 		}
 	}
-
 	detectCycle();
-	//	printg();
+}
+
+void processString()
+{
+	for (int i = 0; i < strlen(addr) - 1; i++)
+	{
+		addr[i] = addr[i + 1];
+	}
+	target[strlen(target) - 2] = ' ';
+	target[strlen(target) - 1] = '\0';
+	addr[strlen(addr) - 2] = '\0';
 }
 
 int main(int argc, char *argv[])
@@ -252,44 +255,31 @@ int main(int argc, char *argv[])
 		if (len > 0)
 		{
 			sscanf(buf, "%d %lu %p", &op, &tid, &lid);
-			printf("%d %lu %p\n", op, tid, lid);
-			if (op == 2)
+
+			switch (op)
 			{
-				int stackTopFlag = 0;
+			case 0:
+				assignmentEdge(tid, lid);
+				break;
+			case 1:
+				releaseAssignmentEdge(tid, lid);
+				break;
+			case 2:
+				int targetFlag = 0;
 				for (int i = 0; i < tid; i++)
 				{
 					read(fd, buf, 128);
-					if (stackTopFlag == 0)
+					if (targetFlag == 0)
 					{
 						sscanf(buf, "%s %s", target, addr);
-						printf("%s %s\n", target, addr);
 						if (!strncmp(argv[1], target, strlen(argv[1])))
 						{
-							for (int i = 0; i < strlen(addr) - 1; i++)
-							{
-								addr[i] = addr[i + 1];
-							}
-							target[strlen(target) - 2] = ' ';
-							target[strlen(target) - 1] = '\0';
-							addr[strlen(addr) - 2] = '\0';
-							stackTopFlag = 1;
+							processString();
+							targetFlag = 1;
 						}
 					}
 				}
-			}
-			else if (op == 0)
-			{
-				assignmentEdge(tid, lid);
-				printg();
-				printf("\n");
-			}
-			else if (op == 3)
-			{
-				releaseAssignmentEdge(tid, lid);
-				printg();
-				printf("\n");
-				cnt++;
-				printf("cnt: %d\n", cnt);
+				break;
 			}
 		}
 	}
