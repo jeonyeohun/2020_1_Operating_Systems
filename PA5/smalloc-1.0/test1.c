@@ -31,6 +31,10 @@ int main()
 	printf("smalloc(1000):%p\n", p4);
 	print_sm_containers();
 
+	printf("srealloc(2000):%p\n", p4);
+	srealloc(p4, 2000);
+	print_sm_containers();
+
 	p5 = smalloc(1200);
 	printf("smalloc(1200):%p\n", p5);
 	print_sm_containers();
@@ -38,4 +42,13 @@ int main()
 	p6 = smalloc(1400);
 	printf("smalloc(1400):%p\n", p5);
 	print_sm_containers();
+
+	printf("srealloc(2000):%p\n", p5);
+	srealloc(p5, 2000);
+	print_sm_containers();
+	print_mem_uses();
+
+	sshrink();
+	print_sm_containers();
+	print_mem_uses();
 }

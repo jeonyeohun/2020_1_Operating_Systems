@@ -1,6 +1,10 @@
 #include <unistd.h>
 #include <stdio.h>
 #include "smalloc.h"
+#include <limits.h>
+#include <string.h>
+
+size_t total_size = 0;
 
 sm_container_t sm_head = {
 	0,
@@ -49,7 +53,8 @@ void *
 smalloc(size_t size)
 {
 	sm_container_ptr hole = 0x0, itr = 0x0;
-	size_t min = sm_head.next->dsize;
+	size_t min = INT_MAX;
+	total_size += size + sizeof(sm_container_t);
 
 	for (itr = sm_head.next; itr != &sm_head; itr = itr->next)
 	{
@@ -101,19 +106,94 @@ void sfree(void *p)
 			if (itr->prev->status == Unused)
 			{
 				start = itr->prev;
-				start->dsize += itr->dsize;
+				start->dsize += itr->dsize + sizeof(sm_container_t);
 				start->next = itr->next;
 				itr->next->prev = start;
 			}
 
 			if (start->next->status == Unused)
 			{
-				start->dsize += start->next->dsize;
+				start->dsize += start->next->dsize + sizeof(sm_container_t);
 				start->next = start->next->next;
 				start->next->next->prev = start;
 			}
 			break;
 		}
+	}
+}
+void print_mem_uses()
+{
+	sm_container_ptr itr;
+	size_t current_alloc_total = 0;
+	size_t current_free_total = 0;
+	for (itr = sm_head.next; itr != &sm_head; itr = itr->next)
+	{
+		if (itr->status == Busy)
+			current_alloc_total += itr->dsize + sizeof(sm_container_t);
+		else
+			current_free_total += itr->dsize + sizeof(sm_container_t);
+	}
+
+	fprintf(stderr, "============== memory usage information =============\n");
+	fprintf(stderr, "Total memory retained: %zu\n", total_size);
+	fprintf(stderr, "Current allocated space: %zu\n", current_alloc_total);
+	fprintf(stderr, "Current free space: %zu\n", current_free_total);
+};
+void *srealloc(void *p, size_t newsize)
+{
+	sm_container_ptr itr, hole;
+	size_t temp_size = 0;
+	for (itr = sm_head.next; itr != &sm_head; itr = itr->next)
+	{
+		if (p == _data(itr))
+		{
+			// case 1: If it is not possible to extend from current memory location
+			if (itr->next == &sm_head || itr->next->status != Unused || itr->next->dsize + sizeof(sm_container_t) < newsize - itr->dsize)
+			{
+				// case 1-1: If there is possible hole to migrate target
+				for (hole = sm_head.next; hole != &sm_head; hole = hole->next)
+				{
+					if (hole->status == Unused && hole->dsize >= newsize)
+					{
+						sm_container_split(hole, newsize);
+						hole->status = Busy;
+						memcpy(hole, p, newsize);
+						sfree(p);
+						return _data(hole);
+					}
+				}
+
+				// case 1-2: If there is no possible hole
+				sm_container_ptr temp = smalloc(newsize);
+				memcpy(temp, p, newsize);
+				sfree(p);
+
+				return _data(temp);
+			}
+			// case 2: If there is a hole in contiguous memory space from the target
+			else if (itr->next->status == Unused && itr->next->dsize + sizeof(sm_container_t) >= newsize - itr->dsize)
+			{
+				itr->next->dsize -= newsize - itr->dsize;
+				itr->dsize = newsize;
+			}
+		}
+	}
+	return _data(itr);
+}
+void sshrink()
+{
+	size_t current_free_total = 0;
+	sm_container_ptr itr;
+	for (itr = sm_head.next; itr != &sm_head; itr = itr->next)
+	{
+		if (itr->status != Busy)
+		{
+			itr->prev->next = itr->next;
+			itr->next->prev = itr->prev;
+			current_free_total += itr->dsize + sizeof(sm_container_t);
+		}
+
+		sbrk(current_free_total * -1);
 	}
 }
 
