@@ -28,7 +28,6 @@ int cycle = 0;
 char target[128];
 char addr[128];
 
-
 int searchLock(int *lock)
 {
 	for (int i = 0; i < edgeCount; i++)
@@ -93,8 +92,8 @@ void detectCycle()
 
 	if (cycle)
 	{
-int		tcount = 1;
-int		mcount = 1;
+		int tcount = 1;
+		int mcount = 1;
 		printf("===============  DEADLOCK DETECTED  ================\n");
 		printf("Below threads and locks are involved in the deadlock\n");
 		printf("____________________________________________________\n");
@@ -212,7 +211,7 @@ void releaseAssignmentEdge(uli T, int *R)
 	int idx = searchLock(R);
 
 	for (int i = idx; i < edgeCount - 1; i++)
-	{	
+	{
 		edges[i] = edges[i + 1];
 	}
 	edgeCount--;
@@ -230,7 +229,7 @@ void releaseAssignmentEdge(uli T, int *R)
 	detectCycle();
 }
 
-void processString(char * btrace, char * filename)
+void processString(char *btrace, char *filename)
 {
 	char *ptr;
 	ptr = strstr(btrace, filename);
@@ -238,8 +237,9 @@ void processString(char * btrace, char * filename)
 	ptr = strstr(ptr, "[");
 	char temp[20];
 	int i = 0;
-	ptr = ptr+1;
-	while(*ptr !=']'){
+	ptr = ptr + 1;
+	while (*ptr != ']')
+	{
 		temp[i++] = *ptr;
 		ptr++;
 	}
@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
 	{
 		uli tid;
 		int *lid;
-				char btrace[512];
+		char btrace[512];
 
 		char buf[512];
 		int len = 0;
@@ -273,7 +273,7 @@ int main(int argc, char *argv[])
 				assignmentEdge(tid, lid);
 				break;
 			case 1:
-				sscanf(buf, "%d %lu %p",&op, &tid, &lid);
+				sscanf(buf, "%d %lu %p", &op, &tid, &lid);
 				releaseAssignmentEdge(tid, lid);
 				break;
 			case 2:
