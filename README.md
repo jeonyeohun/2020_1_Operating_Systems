@@ -26,3 +26,42 @@ usage:
 ~~~
 ./ptsp <data file> <number of maximum child process>
 ~~~
+
+
+## PA3 : Muti-Threaded TSP Solver 
+A TSP(Travel Saleman Problem) solver by creating mutiple process. This program uses concept of producer-consumer structure with bounded buffer to assign new subtask to working threads. Since this program uses multiple threads, the main thread of the program makes intraction with user to give information of current status while the child threads are working for finding solution.
+
+usage:
+~~~
+./mtsp <datafile> <initial number of solver threads>
+~~~
+
+During program execution user can give below commands to interact with the program.
+
+~~~
+stat: print the best solution up to the moment, and the number of checked routes
+threads: print the information of all consumer threads including thread ID, the number of subtasks processed so far, the number of checked routes in the current subtask.
+num N: change the number of consumber threads into N
+~~~
+
+## PA4 : Runtime Deadlock Detector
+A dynamic linked library of deadlock detector. This detecting system consists of two different program. The first one is called "ddmon", a dynamic linked library to hook whenever the target program calls pthread_mutex_lock and pthread_mutex_unlock. This library sends information of the called mutex and the thread who calls the function to checker program called "ddchck". ddchck gets the information from ddmon and construct lock graph to determine the existence of deadlock situation. The basic algorithm concept is described in below.
+
+Algorithm:
+1. Create a node nx when a thread acquires lock X.
+2. Create an edge (nx, ny) when a thread acquires lock Y while holding lock X.
+3. Remove all edges connected to nx when a thread releases X. Remove nx when a thread releases X and no other threads had acquired X
+4. Report deadlcok when the graph has any cycle
+
+Usage:
+~~~
+Build
+> make clean
+> make
+
+Execute ddchck:
+> ./ddchck <Executable of target program>
+
+Execute Target Program with ddmon:
+> LD_PRELOAD="./ddmon.so" <Executable of target program>
+~~~
